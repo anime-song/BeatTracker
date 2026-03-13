@@ -27,6 +27,7 @@ class ExperimentSummary:
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
+    meter_conditioning: Optional[str]
     audio_backend: Optional[str]
     scheduler: Optional[str]
     ema_decay: Optional[float]
@@ -66,6 +67,7 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
+            "meter_conditioning": self.meter_conditioning or "",
             "audio_backend": self.audio_backend or "",
             "scheduler": self.scheduler or "",
             "ema_decay": _format_float(self.ema_decay, digits=4),
@@ -222,6 +224,11 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         train_samples_per_epoch=_as_int(config.get("train_samples_per_epoch")),
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
+        meter_conditioning=(
+            str(config["meter_conditioning"])
+            if config.get("meter_conditioning")
+            else None
+        ),
         audio_backend=str(config["audio_backend"]) if "audio_backend" in config else None,
         scheduler=str(config["scheduler"]) if "scheduler" in config else None,
         ema_decay=_as_float(config.get("ema_decay")),
@@ -277,6 +284,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "train_samples_per_epoch",
         "segment_seconds",
         "meter_loss_weight",
+        "meter_conditioning",
         "audio_backend",
         "scheduler",
         "ema_decay",
@@ -328,6 +336,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_float(summary.lr, digits=6) or "-",
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
+            summary.meter_conditioning or "-",
             summary.model_tag,
             summary.git_branch or "-",
         ]
@@ -346,6 +355,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "lr",
                 "batch",
                 "meter_w",
+                "meter_cond",
                 "model",
                 "branch",
             ],
@@ -395,6 +405,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                             "meter_loss_weight",
                             _format_float(summary.meter_loss_weight, digits=3) or "-",
                         ],
+                        ["meter_conditioning", summary.meter_conditioning or "-"],
                         ["audio_backend", summary.audio_backend or "-"],
                         ["scheduler", summary.scheduler or "-"],
                         ["ema_decay", _format_float(summary.ema_decay) or "-"],

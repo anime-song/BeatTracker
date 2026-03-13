@@ -412,22 +412,35 @@ class BeatDownbeatHead(nn.Module):
         dropout: float = 0.0,
     ):
         super().__init__()
+        self.meter_conditioning = "downbeat_additive"
         self.norm = RMSNorm(input_dim)
         self.dropout = nn.Dropout(dropout)
         self.beat_head = nn.Linear(input_dim, 1)
         self.downbeat_head = nn.Linear(input_dim, 1)
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
+        # meter 予測を downbeat 側だけへ流し込むための射影。
+        self.meter_condition_proj = nn.Linear(
+            num_meter_classes, input_dim, bias=False
+        )
+        nn.init.zeros_(self.meter_condition_proj.weight)
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
         x = self.dropout(x)
 
-        # downbeat は beat の部分集合なので、この実験では beat 側へ直接加算する。
+        # beat 側は従来どおりの head を使う。
         beat_logits = self.beat_head(x).squeeze(-1)
-        downbeat_logits = self.downbeat_head(x).squeeze(-1)
-        beat_logits = beat_logits + downbeat_logits
         meter_logits = self.meter_head(x)
+
+        # meter の確率分布を downbeat 特徴へ加算し、
+        # downbeat 側だけが拍子情報を参照できるようにする。
+        meter_probabilities = torch.softmax(meter_logits, dim=-1)
+        downbeat_features = x + self.meter_condition_proj(meter_probabilities)
+        downbeat_logits = self.downbeat_head(downbeat_features).squeeze(-1)
+
+        # downbeat は beat の部分集合なので、この実験でも beat 側へ直接加算する。
+        beat_logits = beat_logits + downbeat_logits
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(

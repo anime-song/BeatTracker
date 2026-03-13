@@ -233,7 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -1090,6 +1090,7 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "meter_conditioning": model.head.meter_conditioning,
         }
     )
     config_text = json.dumps(config_payload, indent=2, default=str)
@@ -1103,7 +1104,8 @@ def main() -> None:
     print(
         "meter="
         f"classes={train_dataset.num_meter_classes}, "
-        f"labels={list(train_dataset.meter_labels)}"
+        f"labels={list(train_dataset.meter_labels)}, "
+        f"conditioning={model.head.meter_conditioning}"
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
