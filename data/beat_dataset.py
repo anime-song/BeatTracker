@@ -31,6 +31,13 @@ class MeasureAnnotation:
     base_note: str
 
 
+@dataclass(frozen=True)
+class MeterAnnotation:
+    start_sec: float
+    end_sec: float
+    meter_label: str
+
+
 @dataclass
 class SongEntry:
     song_id: str
@@ -44,6 +51,7 @@ class SongEntry:
     available_semitones: tuple[int, ...]
     beat_times: torch.Tensor
     downbeat_times: torch.Tensor
+    meter_annotations: tuple[MeterAnnotation, ...]
     packed_variants: Dict[int, "PackedAudioEntry"] = field(default_factory=dict)
 
 
@@ -92,59 +100,87 @@ def _parse_annotation_file(annotation_path: Path) -> list[MeasureAnnotation]:
     return measures
 
 
-def derive_beat_and_downbeat_times(annotation_path: Path) -> tuple[torch.Tensor, torch.Tensor, float]:
+def _meter_label_sort_key(meter_label: str) -> tuple[int, int]:
+    numerator, denominator = meter_label.split("/", maxsplit=1)
+    return int(numerator), int(denominator)
+
+
+def derive_beat_downbeat_and_meter_annotations(
+    annotation_path: Path,
+) -> tuple[torch.Tensor, torch.Tensor, float, tuple[MeterAnnotation, ...]]:
     measures = _parse_annotation_file(annotation_path)
     if not measures:
         empty = torch.empty(0, dtype=torch.float32)
-        return empty, empty, 0.0
+        return empty, empty, 0.0, tuple()
 
-    durations: list[float] = []
+    beat_times: list[float] = []
+    downbeat_times: list[float] = []
+    meter_annotations: list[MeterAnnotation] = []
     previous_quarter_sec: Optional[float] = None
+    song_end_sec = 0.0
+
     for index, measure in enumerate(measures):
         quarter_notes = measure.time_sig_num * (4.0 / measure.time_sig_den)
         if quarter_notes <= 0:
             raise ValueError(f"Invalid time signature for measure {measure}")
 
-        if index + 1 < len(measures):
+        next_measure = measures[index + 1] if index + 1 < len(measures) else None
+        if next_measure is not None:
             # 基本は「次の小節頭 - 現小節頭」をその小節長とみなす。
-            duration = measures[index + 1].downbeat_sec - measure.downbeat_sec
+            duration = next_measure.downbeat_sec - measure.downbeat_sec
             if duration <= 0:
                 raise ValueError("Annotation downbeats must be strictly increasing")
-        else:
+        elif previous_quarter_sec is not None:
             # 最終小節だけは次の downbeat が無いので、
-            # 直前までの四分音符長、なければ tempo 情報から補う。
-            if previous_quarter_sec is not None:
-                duration = previous_quarter_sec * quarter_notes
-            elif measure.tempo_bpm > 0:
-                duration = (60.0 / measure.tempo_bpm) * quarter_notes
-            else:
-                raise ValueError("Cannot infer the last measure duration without tempo or context")
+            # 直前までに観測できた四分音符長で補う。
+            duration = previous_quarter_sec * quarter_notes
+        elif measure.tempo_bpm > 0:
+            # 先頭かつ単独小節の曲は tempo から長さを推定する。
+            duration = (60.0 / measure.tempo_bpm) * quarter_notes
+        else:
+            raise ValueError(
+                "Cannot infer the last measure duration without tempo or context"
+            )
 
         previous_quarter_sec = duration / quarter_notes
-        durations.append(duration)
+        song_end_sec = measure.downbeat_sec + duration
 
-    beat_times: list[float] = []
-    downbeat_times: list[float] = []
+        # meter は 4/4, 7/8 のような拍子文字列をそのまま 1 クラスとして持つ。
+        meter_annotations.append(
+            MeterAnnotation(
+                start_sec=measure.downbeat_sec,
+                end_sec=measure.downbeat_sec + duration,
+                meter_label=f"{measure.time_sig_num}/{measure.time_sig_den}",
+            )
+        )
 
-    for measure, duration in zip(measures, durations):
-        # beat annotation が無いので、拍数は常に拍子の分子そのものとみなす。
+        # beat annotation が無いので、拍数は拍子の分子そのものとみなす。
         # 例: 7/8 -> 7 beats, 6/4 -> 6 beats
-        beat_count = float(measure.time_sig_num)
+        beat_count = int(measure.time_sig_num)
         if beat_count <= 0:
             continue
 
         step_sec = duration / beat_count
         downbeat_times.append(measure.downbeat_sec)
-        beat_times.append(measure.downbeat_sec)
-
-        # downbeat は beat にも含めるので、小節の 2 拍目以降だけを等間隔で置く。
-        for beat_index in range(1, int(measure.time_sig_num)):
+        # downbeat も beat に含めたいので、小節頭から等間隔で beat を並べる。
+        for beat_index in range(beat_count):
             beat_times.append(measure.downbeat_sec + (beat_index * step_sec))
 
-    song_end_sec = measures[-1].downbeat_sec + durations[-1]
-    beat_tensor = torch.tensor(sorted(beat_times), dtype=torch.float32)
-    downbeat_tensor = torch.tensor(sorted(downbeat_times), dtype=torch.float32)
-    return beat_tensor, downbeat_tensor, float(song_end_sec)
+    beat_tensor = torch.tensor(beat_times, dtype=torch.float32)
+    downbeat_tensor = torch.tensor(downbeat_times, dtype=torch.float32)
+    return (
+        beat_tensor,
+        downbeat_tensor,
+        float(song_end_sec),
+        tuple(meter_annotations),
+    )
+
+
+def derive_beat_and_downbeat_times(annotation_path: Path) -> tuple[torch.Tensor, torch.Tensor, float]:
+    beat_tensor, downbeat_tensor, song_end_sec, _ = (
+        derive_beat_downbeat_and_meter_annotations(annotation_path)
+    )
+    return beat_tensor, downbeat_tensor, song_end_sec
 
 
 def _discover_stem_variants(song_dir: Path, song_id: str, stem_names: Sequence[str]) -> Dict[int, Dict[str, Path]]:
@@ -245,6 +281,7 @@ class BeatStemDataset(Dataset):
         allowed_pitch_shifts: Optional[Iterable[int]] = None,
         audio_backend: str = "wav",
         packed_audio_dir: Optional[str | Path] = None,
+        meter_to_index: Optional[Dict[str, int]] = None,
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
     ) -> None:
@@ -267,6 +304,7 @@ class BeatStemDataset(Dataset):
         self.include_original = include_original
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
+        self.meter_ignore_index = -100
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
@@ -379,7 +417,12 @@ class BeatStemDataset(Dataset):
                 )
                 available_semitones = tuple(sorted(packed_variants))
 
-            beat_times, downbeat_times, label_duration_sec = derive_beat_and_downbeat_times(annotation_path)
+            (
+                beat_times,
+                downbeat_times,
+                label_duration_sec,
+                meter_annotations,
+            ) = derive_beat_downbeat_and_meter_annotations(annotation_path)
             effective_duration_sec = min(audio_duration_sec, label_duration_sec) if label_duration_sec > 0 else audio_duration_sec
             if effective_duration_sec <= 0:
                 continue
@@ -397,6 +440,7 @@ class BeatStemDataset(Dataset):
                     available_semitones=available_semitones,
                     beat_times=beat_times,
                     downbeat_times=downbeat_times,
+                    meter_annotations=meter_annotations,
                     packed_variants=packed_variants,
                 )
             )
@@ -424,6 +468,53 @@ class BeatStemDataset(Dataset):
         self.target_num_frames = 1 + ((self.segment_samples - self.n_fft) // self.hop_length)
 
         self.songs = songs
+        detected_meter_labels = {
+            meter_annotation.meter_label
+            for song in self.songs
+            for meter_annotation in song.meter_annotations
+        }
+        if not detected_meter_labels:
+            raise ValueError("No meter labels found in the loaded annotations")
+
+        # meter の class index は train/val で必ず一致させる。
+        # val 側では train_dataset.meter_to_index を受け取って固定する。
+        if meter_to_index is None:
+            meter_labels = tuple(
+                sorted(detected_meter_labels, key=_meter_label_sort_key)
+            )
+            resolved_meter_to_index = {
+                meter_label: index for index, meter_label in enumerate(meter_labels)
+            }
+        else:
+            resolved_meter_to_index = {
+                str(meter_label): int(index)
+                for meter_label, index in meter_to_index.items()
+            }
+            expected_indices = set(range(len(resolved_meter_to_index)))
+            if set(resolved_meter_to_index.values()) != expected_indices:
+                raise ValueError(
+                    "meter_to_index must map classes to a contiguous index range"
+                )
+            missing_meter_labels = sorted(
+                detected_meter_labels.difference(resolved_meter_to_index),
+                key=_meter_label_sort_key,
+            )
+            if missing_meter_labels:
+                raise ValueError(
+                    "meter_to_index is missing classes required by the dataset: "
+                    + ", ".join(missing_meter_labels)
+                )
+            meter_labels = tuple(
+                meter_label
+                for meter_label, _ in sorted(
+                    resolved_meter_to_index.items(), key=lambda item: item[1]
+                )
+            )
+
+        self.meter_labels = meter_labels
+        self.meter_to_index = resolved_meter_to_index
+        self.num_meter_classes = len(self.meter_labels)
+        self.meter_class_counts = self._compute_meter_class_counts()
 
     def __len__(self) -> int:
         if self.samples_per_epoch is not None:
@@ -601,6 +692,77 @@ class BeatStemDataset(Dataset):
             targets[frame_indices.unique()] = 1.0
         return targets
 
+    def _meter_annotations_to_frame_targets(
+        self,
+        song: SongEntry,
+        start_sec: float,
+        target_num_frames: int,
+        valid_frames: int,
+    ) -> torch.Tensor:
+        targets = torch.full(
+            (target_num_frames,),
+            fill_value=self.meter_ignore_index,
+            dtype=torch.long,
+        )
+        if valid_frames <= 0:
+            return targets
+
+        labeled_duration_sec = valid_frames * self.hop_length / self.sample_rate
+        frame_scale = self.sample_rate / self.hop_length
+        for meter_annotation in song.meter_annotations:
+            relative_start_sec = meter_annotation.start_sec - start_sec
+            relative_end_sec = meter_annotation.end_sec - start_sec
+            if relative_end_sec <= 0.0 or relative_start_sec >= labeled_duration_sec:
+                continue
+
+            clipped_start_sec = max(relative_start_sec, 0.0)
+            clipped_end_sec = min(relative_end_sec, labeled_duration_sec)
+            # meter は downbeat 付近だけでなく、小節に属する全フレームへ貼る。
+            frame_start = int(math.ceil((clipped_start_sec * frame_scale) - 1e-8))
+            frame_end = int(math.ceil((clipped_end_sec * frame_scale) - 1e-8))
+            frame_start = min(max(frame_start, 0), valid_frames)
+            frame_end = min(max(frame_end, 0), valid_frames)
+            if frame_end <= frame_start:
+                continue
+
+            meter_index = self.meter_to_index.get(meter_annotation.meter_label)
+            if meter_index is None:
+                raise ValueError(
+                    f"Unknown meter label {meter_annotation.meter_label} for song {song.song_id}"
+                )
+            targets[frame_start:frame_end] = meter_index
+        return targets
+
+    def _compute_meter_class_counts(self) -> torch.Tensor:
+        class_counts = torch.zeros(self.num_meter_classes, dtype=torch.long)
+        for song in self.songs:
+            # BalancedSoftmaxLoss 用に、train split 全体で
+            # 「各 meter が何フレーム出たか」を数える。
+            valid_samples = int(round(song.effective_duration_sec * self.sample_rate))
+            if valid_samples < self.n_fft:
+                continue
+
+            valid_frames = 1 + ((valid_samples - self.n_fft) // self.hop_length)
+            if valid_frames <= 0:
+                continue
+
+            meter_targets = self._meter_annotations_to_frame_targets(
+                song=song,
+                start_sec=0.0,
+                target_num_frames=valid_frames,
+                valid_frames=valid_frames,
+            )
+            labeled_targets = meter_targets[
+                meter_targets != self.meter_ignore_index
+            ]
+            if labeled_targets.numel() == 0:
+                continue
+
+            class_counts += torch.bincount(
+                labeled_targets, minlength=self.num_meter_classes
+            )
+        return class_counts
+
     def make_sample(
         self,
         song: SongEntry,
@@ -638,11 +800,18 @@ class BeatStemDataset(Dataset):
 
         beat_targets = self._events_to_frame_targets(song.beat_times, start_sec, valid_frames)
         downbeat_targets = self._events_to_frame_targets(song.downbeat_times, start_sec, valid_frames)
+        meter_targets = self._meter_annotations_to_frame_targets(
+            song=song,
+            start_sec=start_sec,
+            target_num_frames=self.target_num_frames,
+            valid_frames=valid_frames,
+        )
 
         return {
             "waveform": waveform,
             "beat_targets": beat_targets,
             "downbeat_targets": downbeat_targets,
+            "meter_targets": meter_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

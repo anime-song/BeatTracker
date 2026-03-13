@@ -5,7 +5,12 @@ from typing import Dict, Union, List, Optional, Tuple
 
 
 class BalancedSoftmaxLoss(nn.Module):
-    def __init__(self, class_counts: Union[List[int], torch.Tensor], tau: float = 1.0):
+    def __init__(
+        self,
+        class_counts: Union[List[int], torch.Tensor],
+        tau: float = 1.0,
+        ignore_index: int = -100,
+    ):
         """
         Args:
             class_counts (Union[List[int], torch.Tensor]):
@@ -15,7 +20,7 @@ class BalancedSoftmaxLoss(nn.Module):
         """
         super().__init__()
 
-        class_counts = torch.tensor(class_counts, dtype=torch.float32)
+        class_counts = torch.as_tensor(class_counts, dtype=torch.float32)
 
         # log_prior を計算し、バッファとして登録
         # カウントが0のクラスは-infになるのを防ぐため、非常に小さい値にクリップ
@@ -23,12 +28,13 @@ class BalancedSoftmaxLoss(nn.Module):
 
         self.register_buffer("log_prior", log_prior)
         self.tau = tau
+        self.ignore_index = int(ignore_index)
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         """
         Args:
             logits (torch.Tensor): モデルの出力ロジット (B, T, C)
-            labels (torch.Tensor): 正解ラベル (B, T, 1)
+            labels (torch.Tensor): 正解ラベル (B, T)
 
         Returns:
             torch.Tensor: 計算された損失値 (スカラー)
@@ -38,9 +44,16 @@ class BalancedSoftmaxLoss(nn.Module):
             logits = logits.reshape(-1, logits.size(-1))  # (B*T, C)
             labels = labels.reshape(-1)  # (B*T,)
 
+        # meter が未定義のフレームは ignore_index にして、そのまま落とす。
+        valid = labels != self.ignore_index
+        if not torch.any(valid):
+            return logits.sum() * 0.0
+
+        logits = logits[valid]
+        labels = labels[valid]
+
         # ロジット補正: z_k <- z_k + τ * log(n_k)
         adjusted_logits = logits + self.tau * self.log_prior
-
         loss = F.cross_entropy(adjusted_logits, labels)
         return loss
 
