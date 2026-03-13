@@ -412,14 +412,19 @@ class BeatDownbeatHead(nn.Module):
         dropout: float = 0.0,
     ):
         super().__init__()
+        self.meter_head_source = "context_lowres"
         self.norm = RMSNorm(input_dim)
         self.dropout = nn.Dropout(dropout)
         self.beat_head = nn.Linear(input_dim, 1)
         self.downbeat_head = nn.Linear(input_dim, 1)
-        # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
+        # meter は低解像度の文脈特徴から当てたいので、head 自体は分けて持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
 
-    def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
+    def forward(
+        self,
+        frame_features: torch.Tensor,
+        context_features: Optional[torch.Tensor] = None,
+    ) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
         x = self.dropout(x)
 
@@ -427,7 +432,18 @@ class BeatDownbeatHead(nn.Module):
         beat_logits = self.beat_head(x).squeeze(-1)
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
         beat_logits = beat_logits + downbeat_logits
-        meter_logits = self.meter_head(x)
+
+        meter_source = context_features if context_features is not None else frame_features
+        meter_x = self.norm(meter_source)
+        meter_x = self.dropout(meter_x)
+        meter_logits = self.meter_head(meter_x)
+        if meter_logits.shape[1] != frame_features.shape[1]:
+            # meter は低解像度の文脈系列で予測し、loss 用に frame 長へ最近傍で広げる。
+            meter_logits = F.interpolate(
+                meter_logits.transpose(1, 2),
+                size=frame_features.shape[1],
+                mode="nearest",
+            ).transpose(1, 2)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -478,18 +494,17 @@ class BeatTranscriptionModel(nn.Module):
                 context=context,
                 return_intermediate=True,
             )
-        elif return_context:
+        else:
+            # meter head は低解像度の文脈特徴を使うので、通常経路でも context を受け取る。
             frame_features, context_features = self.backbone(
                 waveform,
                 context=context,
                 return_context=True,
             )
-        else:
-            frame_features = self.backbone(waveform, context=context)
 
-        output = self.head(frame_features)
+        output = self.head(frame_features, context_features=context_features)
         if return_features:
             output.frame_features = frame_features
-        output.context_features = context_features
+        output.context_features = context_features if return_context else None
         output.intermediate_features = intermediate_features
         return output

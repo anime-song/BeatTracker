@@ -1089,6 +1089,7 @@ def main() -> None:
     config_payload.update(
         {
             "meter_label_mode": train_dataset.meter_label_mode,
+            "meter_head_source": model.head.meter_head_source,
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
         }
@@ -1104,6 +1105,7 @@ def main() -> None:
     print(
         "meter="
         f"mode={train_dataset.meter_label_mode}, "
+        f"head_source={model.head.meter_head_source}, "
         f"classes={train_dataset.num_meter_classes}, "
         f"labels={list(train_dataset.meter_labels)}"
     )

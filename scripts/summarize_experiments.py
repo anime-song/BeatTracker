@@ -27,6 +27,7 @@ class ExperimentSummary:
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
     meter_label_mode: Optional[str]
+    meter_head_source: Optional[str]
     meter_loss_weight: Optional[float]
     audio_backend: Optional[str]
     scheduler: Optional[str]
@@ -67,6 +68,7 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_label_mode": self.meter_label_mode or "",
+            "meter_head_source": self.meter_head_source or "",
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
             "audio_backend": self.audio_backend or "",
             "scheduler": self.scheduler or "",
@@ -228,6 +230,11 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
             if "meter_label_mode" in config
             else None
         ),
+        meter_head_source=(
+            str(config["meter_head_source"])
+            if "meter_head_source" in config
+            else None
+        ),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
         audio_backend=str(config["audio_backend"]) if "audio_backend" in config else None,
         scheduler=str(config["scheduler"]) if "scheduler" in config else None,
@@ -284,6 +291,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "train_samples_per_epoch",
         "segment_seconds",
         "meter_label_mode",
+        "meter_head_source",
         "meter_loss_weight",
         "audio_backend",
         "scheduler",
@@ -336,6 +344,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_float(summary.lr, digits=6) or "-",
             _format_int(summary.batch_size) or "-",
             summary.meter_label_mode or "-",
+            summary.meter_head_source or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
             summary.model_tag,
             summary.git_branch or "-",
@@ -355,6 +364,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "lr",
                 "batch",
                 "meter_mode",
+                "meter_head",
                 "meter_w",
                 "model",
                 "branch",
@@ -402,6 +412,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                             _format_float(summary.segment_seconds, digits=1) or "-",
                         ],
                         ["meter_label_mode", summary.meter_label_mode or "-"],
+                        ["meter_head_source", summary.meter_head_source or "-"],
                         [
                             "meter_loss_weight",
                             _format_float(summary.meter_loss_weight, digits=3) or "-",
