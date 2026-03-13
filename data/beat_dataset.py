@@ -20,6 +20,7 @@ from torch.utils.data import Dataset
 DEFAULT_STEM_NAMES = ("bass", "drums", "guitar", "other", "piano", "vocals")
 PITCH_SUFFIX_PATTERN = re.compile(r"_pitch_(-?\d+)st$")
 PACKED_PITCH_SUFFIX_PATTERN = re.compile(r"_pitch_(-?\d+)st$")
+METER_LABEL_MODE = "numerator"
 
 
 @dataclass(frozen=True)
@@ -100,9 +101,8 @@ def _parse_annotation_file(annotation_path: Path) -> list[MeasureAnnotation]:
     return measures
 
 
-def _meter_label_sort_key(meter_label: str) -> tuple[int, int]:
-    numerator, denominator = meter_label.split("/", maxsplit=1)
-    return int(numerator), int(denominator)
+def _meter_label_sort_key(meter_label: str) -> int:
+    return int(meter_label)
 
 
 def derive_beat_downbeat_and_meter_annotations(
@@ -145,12 +145,13 @@ def derive_beat_downbeat_and_meter_annotations(
         previous_quarter_sec = duration / quarter_notes
         song_end_sec = measure.downbeat_sec + duration
 
-        # meter は 4/4, 7/8 のような拍子文字列をそのまま 1 クラスとして持つ。
+        # このブランチでは meter を 4/4 や 4/8 に分けず、
+        # 分子だけを 1 クラスとして持つ。
         meter_annotations.append(
             MeterAnnotation(
                 start_sec=measure.downbeat_sec,
                 end_sec=measure.downbeat_sec + duration,
-                meter_label=f"{measure.time_sig_num}/{measure.time_sig_den}",
+                meter_label=str(measure.time_sig_num),
             )
         )
 
@@ -304,6 +305,7 @@ class BeatStemDataset(Dataset):
         self.include_original = include_original
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
+        self.meter_label_mode = METER_LABEL_MODE
         self.meter_ignore_index = -100
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
@@ -477,6 +479,7 @@ class BeatStemDataset(Dataset):
             raise ValueError("No meter labels found in the loaded annotations")
 
         # meter の class index は train/val で必ず一致させる。
+        # このブランチでは denominator を落として、分子だけで class を作る。
         # val 側では train_dataset.meter_to_index を受け取って固定する。
         if meter_to_index is None:
             meter_labels = tuple(

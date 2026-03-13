@@ -233,7 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -1088,6 +1088,7 @@ def main() -> None:
     config_payload.update(collect_git_metadata(project_root))
     config_payload.update(
         {
+            "meter_label_mode": train_dataset.meter_label_mode,
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
         }
@@ -1102,6 +1103,7 @@ def main() -> None:
     print(f"val_segments={len(val_loader.dataset)}, val_batches={len(val_loader)}")
     print(
         "meter="
+        f"mode={train_dataset.meter_label_mode}, "
         f"classes={train_dataset.num_meter_classes}, "
         f"labels={list(train_dataset.meter_labels)}"
     )
