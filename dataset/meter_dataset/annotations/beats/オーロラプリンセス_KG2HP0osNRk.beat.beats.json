@@ -1,0 +1,1843 @@
+{
+  "youtube_id": "KG2HP0osNRk",
+  "measures": [
+    {
+      "measure_index": 0,
+      "downbeat_sec": 0.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 1,
+      "downbeat_sec": 2.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 2,
+      "downbeat_sec": 3.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 3,
+      "downbeat_sec": 5.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 4,
+      "downbeat_sec": 7.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 5,
+      "downbeat_sec": 8.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 6,
+      "downbeat_sec": 10.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 7,
+      "downbeat_sec": 11.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 8,
+      "downbeat_sec": 13.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 9,
+      "downbeat_sec": 15.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 10,
+      "downbeat_sec": 16.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 11,
+      "downbeat_sec": 18.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 12,
+      "downbeat_sec": 20.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 13,
+      "downbeat_sec": 21.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 14,
+      "downbeat_sec": 23.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 15,
+      "downbeat_sec": 25.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 16,
+      "downbeat_sec": 26.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 17,
+      "downbeat_sec": 28.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 18,
+      "downbeat_sec": 29.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 19,
+      "downbeat_sec": 31.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 20,
+      "downbeat_sec": 33.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 21,
+      "downbeat_sec": 34.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 22,
+      "downbeat_sec": 36.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 23,
+      "downbeat_sec": 38.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 24,
+      "downbeat_sec": 39.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 25,
+      "downbeat_sec": 41.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 26,
+      "downbeat_sec": 43.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 27,
+      "downbeat_sec": 44.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 28,
+      "downbeat_sec": 46.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 29,
+      "downbeat_sec": 47.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 30,
+      "downbeat_sec": 49.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 31,
+      "downbeat_sec": 51.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 32,
+      "downbeat_sec": 52.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 33,
+      "downbeat_sec": 54.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 34,
+      "downbeat_sec": 56.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 35,
+      "downbeat_sec": 57.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 36,
+      "downbeat_sec": 59.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 37,
+      "downbeat_sec": 61.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 38,
+      "downbeat_sec": 62.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 39,
+      "downbeat_sec": 64.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 40,
+      "downbeat_sec": 65.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 41,
+      "downbeat_sec": 67.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 42,
+      "downbeat_sec": 69.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 43,
+      "downbeat_sec": 70.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 44,
+      "downbeat_sec": 72.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 45,
+      "downbeat_sec": 74.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 46,
+      "downbeat_sec": 75.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 47,
+      "downbeat_sec": 77.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 48,
+      "downbeat_sec": 79.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 49,
+      "downbeat_sec": 80.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 50,
+      "downbeat_sec": 82.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 51,
+      "downbeat_sec": 83.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 52,
+      "downbeat_sec": 85.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 53,
+      "downbeat_sec": 87.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 54,
+      "downbeat_sec": 88.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 55,
+      "downbeat_sec": 90.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 56,
+      "downbeat_sec": 92.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 57,
+      "downbeat_sec": 93.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 58,
+      "downbeat_sec": 95.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 59,
+      "downbeat_sec": 97.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 60,
+      "downbeat_sec": 98.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 61,
+      "downbeat_sec": 100.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 62,
+      "downbeat_sec": 101.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 63,
+      "downbeat_sec": 103.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 64,
+      "downbeat_sec": 105.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 65,
+      "downbeat_sec": 106.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 66,
+      "downbeat_sec": 108.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 67,
+      "downbeat_sec": 110.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 68,
+      "downbeat_sec": 111.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 69,
+      "downbeat_sec": 113.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 70,
+      "downbeat_sec": 115.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 71,
+      "downbeat_sec": 116.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 72,
+      "downbeat_sec": 118.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 73,
+      "downbeat_sec": 119.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 74,
+      "downbeat_sec": 121.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 75,
+      "downbeat_sec": 123.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 76,
+      "downbeat_sec": 124.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 77,
+      "downbeat_sec": 126.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 78,
+      "downbeat_sec": 128.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 79,
+      "downbeat_sec": 129.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 80,
+      "downbeat_sec": 131.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 81,
+      "downbeat_sec": 133.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 82,
+      "downbeat_sec": 134.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 83,
+      "downbeat_sec": 136.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 84,
+      "downbeat_sec": 137.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 85,
+      "downbeat_sec": 139.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 86,
+      "downbeat_sec": 141.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 87,
+      "downbeat_sec": 142.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 88,
+      "downbeat_sec": 144.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 89,
+      "downbeat_sec": 146.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 90,
+      "downbeat_sec": 147.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 91,
+      "downbeat_sec": 149.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 92,
+      "downbeat_sec": 151.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 93,
+      "downbeat_sec": 152.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 94,
+      "downbeat_sec": 154.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 95,
+      "downbeat_sec": 155.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 96,
+      "downbeat_sec": 157.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 97,
+      "downbeat_sec": 159.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 98,
+      "downbeat_sec": 160.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 99,
+      "downbeat_sec": 162.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 100,
+      "downbeat_sec": 164.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 101,
+      "downbeat_sec": 165.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 102,
+      "downbeat_sec": 167.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 103,
+      "downbeat_sec": 169.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 104,
+      "downbeat_sec": 170.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 105,
+      "downbeat_sec": 172.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 106,
+      "downbeat_sec": 173.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 107,
+      "downbeat_sec": 175.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 108,
+      "downbeat_sec": 177.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 109,
+      "downbeat_sec": 178.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 110,
+      "downbeat_sec": 180.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 111,
+      "downbeat_sec": 182.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 112,
+      "downbeat_sec": 183.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 113,
+      "downbeat_sec": 185.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 114,
+      "downbeat_sec": 187.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 115,
+      "downbeat_sec": 188.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 116,
+      "downbeat_sec": 190.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 117,
+      "downbeat_sec": 191.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 118,
+      "downbeat_sec": 193.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 119,
+      "downbeat_sec": 195.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 120,
+      "downbeat_sec": 196.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 121,
+      "downbeat_sec": 198.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 122,
+      "downbeat_sec": 200.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 123,
+      "downbeat_sec": 201.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 124,
+      "downbeat_sec": 203.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 125,
+      "downbeat_sec": 205.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 126,
+      "downbeat_sec": 206.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 127,
+      "downbeat_sec": 208.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 128,
+      "downbeat_sec": 209.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 129,
+      "downbeat_sec": 211.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 130,
+      "downbeat_sec": 213.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 131,
+      "downbeat_sec": 214.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 132,
+      "downbeat_sec": 216.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 133,
+      "downbeat_sec": 218.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 134,
+      "downbeat_sec": 219.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 135,
+      "downbeat_sec": 221.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 136,
+      "downbeat_sec": 223.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 137,
+      "downbeat_sec": 224.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 138,
+      "downbeat_sec": 226.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 139,
+      "downbeat_sec": 227.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 140,
+      "downbeat_sec": 229.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 141,
+      "downbeat_sec": 231.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 142,
+      "downbeat_sec": 232.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 143,
+      "downbeat_sec": 234.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 144,
+      "downbeat_sec": 236.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 145,
+      "downbeat_sec": 237.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 146,
+      "downbeat_sec": 239.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 147,
+      "downbeat_sec": 241.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 148,
+      "downbeat_sec": 242.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 149,
+      "downbeat_sec": 244.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 150,
+      "downbeat_sec": 245.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 151,
+      "downbeat_sec": 247.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 152,
+      "downbeat_sec": 249.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 153,
+      "downbeat_sec": 250.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 154,
+      "downbeat_sec": 252.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 155,
+      "downbeat_sec": 254.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 156,
+      "downbeat_sec": 255.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 157,
+      "downbeat_sec": 257.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 158,
+      "downbeat_sec": 259.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 159,
+      "downbeat_sec": 260.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 160,
+      "downbeat_sec": 262.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 161,
+      "downbeat_sec": 263.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 162,
+      "downbeat_sec": 265.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 163,
+      "downbeat_sec": 267.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 164,
+      "downbeat_sec": 268.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 165,
+      "downbeat_sec": 270.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 166,
+      "downbeat_sec": 272.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 167,
+      "downbeat_sec": 273.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 168,
+      "downbeat_sec": 275.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 169,
+      "downbeat_sec": 277.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 170,
+      "downbeat_sec": 278.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 171,
+      "downbeat_sec": 280.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 172,
+      "downbeat_sec": 281.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 173,
+      "downbeat_sec": 283.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 174,
+      "downbeat_sec": 285.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 175,
+      "downbeat_sec": 286.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 176,
+      "downbeat_sec": 288.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 177,
+      "downbeat_sec": 290.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 178,
+      "downbeat_sec": 291.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 179,
+      "downbeat_sec": 293.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 180,
+      "downbeat_sec": 295.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 181,
+      "downbeat_sec": 296.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 182,
+      "downbeat_sec": 298.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 183,
+      "downbeat_sec": 299.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 184,
+      "downbeat_sec": 301.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 185,
+      "downbeat_sec": 303.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 186,
+      "downbeat_sec": 304.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 187,
+      "downbeat_sec": 306.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 188,
+      "downbeat_sec": 308.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 189,
+      "downbeat_sec": 309.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 190,
+      "downbeat_sec": 311.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 191,
+      "downbeat_sec": 313.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 192,
+      "downbeat_sec": 314.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 193,
+      "downbeat_sec": 316.3582,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 194,
+      "downbeat_sec": 317.9945,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 195,
+      "downbeat_sec": 319.6309,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 196,
+      "downbeat_sec": 321.2673,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 197,
+      "downbeat_sec": 322.9036,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 198,
+      "downbeat_sec": 324.54,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 199,
+      "downbeat_sec": 326.1764,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 200,
+      "downbeat_sec": 327.8127,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 201,
+      "downbeat_sec": 329.4491,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 202,
+      "downbeat_sec": 331.0855,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": []
+    },
+    {
+      "measure_index": 203,
+      "downbeat_sec": 332.7218,
+      "time_sig_num": 3,
+      "time_sig_den": 4,
+      "tempo_bpm": 110,
+      "base_note": "quarter",
+      "annotations": [
+        "fermata"
+      ]
+    }
+  ]
+}

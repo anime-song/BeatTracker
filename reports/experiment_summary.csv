@@ -1,0 +1,2 @@
+run_name,status,best_epoch,best_downbeat_f1,best_beat_f1,best_val_loss,last_epoch,last_downbeat_f1,configured_epochs,seed,lr,batch_size,train_samples_per_epoch,segment_seconds,audio_backend,scheduler,ema_decay,num_layers,hidden_size,output_dim,resume,git_branch,git_commit,git_dirty,run_path
+beat_transcription,complete,21,0.3141,0.4926,0.9633,30,0.2986,30,42,0.000300,8,1024,30.0,packed,warmup_cosine,0.9990,6,64,256,,,,,outputs/beat_transcription

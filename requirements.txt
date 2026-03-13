@@ -1,0 +1,12 @@
+stem-splitter
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.0+cu128
+torchaudio==2.7.0+cu128
+tensorboard
+torch_optimizer
+audiomentations
+pyyaml
+einops
+tqdm
+soundfile
+mir_eval @ https://github.com/mir-evaluation/mir_eval/archive/main.zip
