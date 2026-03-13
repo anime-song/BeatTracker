@@ -415,8 +415,10 @@ class BeatDownbeatHead(nn.Module):
         x = self.norm(frame_features)
         x = self.dropout(x)
 
+        # downbeat は beat の部分集合なので、この実験では beat 側へ直接加算する。
         beat_logits = self.beat_head(x).squeeze(-1)
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
+        beat_logits = beat_logits + downbeat_logits
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
