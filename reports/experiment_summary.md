@@ -1,14 +1,43 @@
 # Experiment Summary
 
-Generated: 2026-03-13 02:55:37 UTC
+Generated: 2026-03-13 04:06:20 UTC
 
-Runs: 3
+Runs: 4
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | L6/H64/O256 | exp/meter-classification |
 | exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/meter-classification |
+
+## exp_meter_classification_w0_1
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_1 |
+| status | complete |
+| best_epoch | 24 |
+| best_downbeat_f1 | 0.3508 |
+| best_beat_f1 | 0.5380 |
+| best_val_loss | 1.4538 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3388 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.100 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/meter-classification |
+| git_commit | 07357ebe083aafc7234dad09257aa3b76e9e6ebe |
+| git_dirty | true |
 
 ## exp_beat_plus_downbeat_logits
 

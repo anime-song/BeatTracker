@@ -233,6 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -504,9 +505,7 @@ def load_resume_state(
     history_path: Path,
     steps_per_epoch: int,
 ) -> ResumeState:
-    checkpoint = torch.load(
-        checkpoint_path, map_location="cpu", weights_only=False
-    )
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     optimizer_state = checkpoint.get("optimizer_state_dict")
@@ -567,6 +566,7 @@ def compute_loss(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if output.meter_logits is None:
         raise ValueError("Model output must include meter_logits")
@@ -581,7 +581,8 @@ def compute_loss(
 
     # meter は小節全体のフレームへ貼った多クラス分類として扱う。
     # 末尾の無効フレームは ignore_index にして loss から外す。
-    meter_loss = meter_loss_fn(output.meter_logits, batch["meter_targets"])
+    raw_meter_loss = meter_loss_fn(output.meter_logits, batch["meter_targets"])
+    meter_loss = raw_meter_loss * meter_loss_weight
     valid_meter = batch["meter_targets"] != meter_loss_fn.ignore_index
     if bool(valid_meter.any()):
         meter_predictions = output.meter_logits.argmax(dim=-1)
@@ -601,6 +602,7 @@ def compute_loss(
         "beat_loss": float(beat_loss.detach()),
         "downbeat_loss": float(downbeat_loss.detach()),
         "meter_loss": float(meter_loss.detach()),
+        "raw_meter_loss": float(raw_meter_loss.detach()),
         "meter_accuracy": meter_accuracy,
     }
 
@@ -701,6 +703,7 @@ def train_one_epoch(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -729,7 +732,12 @@ def train_one_epoch(
         ):
             output = model(batch["waveform"])
             loss, loss_info = compute_loss(
-                output, batch, beat_loss_fn, downbeat_loss_fn, meter_loss_fn
+                output,
+                batch,
+                beat_loss_fn,
+                downbeat_loss_fn,
+                meter_loss_fn,
+                meter_loss_weight,
             )
 
         if scaler.is_enabled():
@@ -774,6 +782,11 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/raw_meter_loss",
+                loss_info["raw_meter_loss"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/lr", optimizer.param_groups[0]["lr"], global_step
             )
 
@@ -795,6 +808,7 @@ def validate(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -832,7 +846,12 @@ def validate(
         batch = move_batch_to_device(batch, device)
         output = model(batch["waveform"])
         _, loss_info = compute_loss(
-            output, batch, beat_loss_fn, downbeat_loss_fn, meter_loss_fn
+            output,
+            batch,
+            beat_loss_fn,
+            downbeat_loss_fn,
+            meter_loss_fn,
+            meter_loss_weight,
         )
 
         tracker.update(loss_info)
@@ -990,6 +1009,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "beat_loss",
         "downbeat_loss",
         "meter_loss",
+        "raw_meter_loss",
         "meter_accuracy",
         "beat_precision",
         "beat_recall",
@@ -1086,6 +1106,7 @@ def main() -> None:
         f"labels={list(train_dataset.meter_labels)}"
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
+    print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1121,6 +1142,7 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                meter_loss_weight=args.meter_loss_weight,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
@@ -1136,6 +1158,7 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                meter_loss_weight=args.meter_loss_weight,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,
