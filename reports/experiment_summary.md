@@ -1,13 +1,14 @@
 # Experiment Summary
 
-Generated: 2026-03-13 01:30:42 UTC
+Generated: 2026-03-13 02:55:37 UTC
 
-Runs: 2
+Runs: 3
 
-| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | model | branch |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | L6/H64/O256 | exp/beat-plus-downbeat-logits |
-| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | L6/H64/O256 | - |
+| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | model | branch |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
+| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | L6/H64/O256 | - |
+| exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/meter-classification |
 
 ## exp_beat_plus_downbeat_logits
 
@@ -27,6 +28,7 @@ Runs: 2
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| meter_loss_weight | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -54,6 +56,7 @@ Runs: 2
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| meter_loss_weight | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -62,3 +65,31 @@ Runs: 2
 | git_branch | - |
 | git_commit | - |
 | git_dirty | - |
+
+## exp_meter_classification
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification |
+| status | complete |
+| best_epoch | 25 |
+| best_downbeat_f1 | 0.2561 |
+| best_beat_f1 | 0.5061 |
+| best_val_loss | 5.4904 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.2559 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | - |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/meter-classification |
+| git_commit | bcef203d753b4517de3fc0dfb45e57021ac92e0e |
+| git_dirty | true |
