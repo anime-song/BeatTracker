@@ -1,15 +1,19 @@
 # Experiment Summary
 
-Generated: 2026-03-13 06:30:24 UTC
+Generated: 2026-03-13 13:55:22 UTC
 
-Runs: 6
+Runs: 10
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-classification |
+| exp_meter_classification_w0_0_5_beatpw10 | complete | 19 | 0.3599 | 30 | 0.3255 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/beat-pos-weight |
 | exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | L6/H64/O256 | exp/meter-classification |
+| exp_meter_numerator_w0_05 | complete | 28 | 0.3398 | 30 | 0.3379 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-numerator-classification |
+| exp_meter_context_lowres_w0_05 | complete | 22 | 0.3382 | 30 | 0.3158 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-context-lowres |
 | exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
 | exp_meter_classification_w0_3 | complete | 24 | 0.3249 | 30 | 0.3174 | 42 | 0.000300 | 8 | 0.300 | L6/H64/O256 | exp/meter-classification |
+| exp_meter_downbeat_conditioning_w0_05 | complete | 18 | 0.3248 | 30 | 0.3090 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-downbeat-conditioning |
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/meter-classification |
 
@@ -41,6 +45,34 @@ Runs: 6
 | git_commit | 8af5e0224aad55ca3e419c04bc182d2e86acb6b0 |
 | git_dirty | true |
 
+## exp_meter_classification_w0_0_5_beatpw10
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_beatpw10 |
+| status | complete |
+| best_epoch | 19 |
+| best_downbeat_f1 | 0.3599 |
+| best_beat_f1 | 0.6227 |
+| best_val_loss | 1.2610 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3255 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/beat-pos-weight |
+| git_commit | e545cd80edb38d95f645441fff508640064d0372 |
+| git_dirty | true |
+
 ## exp_meter_classification_w0_1
 
 | field | value |
@@ -67,6 +99,62 @@ Runs: 6
 | resume | - |
 | git_branch | exp/meter-classification |
 | git_commit | 07357ebe083aafc7234dad09257aa3b76e9e6ebe |
+| git_dirty | true |
+
+## exp_meter_numerator_w0_05
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_numerator_w0_05 |
+| status | complete |
+| best_epoch | 28 |
+| best_downbeat_f1 | 0.3398 |
+| best_beat_f1 | 0.5411 |
+| best_val_loss | 1.2611 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3379 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/meter-numerator-classification |
+| git_commit | e545cd80edb38d95f645441fff508640064d0372 |
+| git_dirty | true |
+
+## exp_meter_context_lowres_w0_05
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_context_lowres_w0_05 |
+| status | complete |
+| best_epoch | 22 |
+| best_downbeat_f1 | 0.3382 |
+| best_beat_f1 | 0.5287 |
+| best_val_loss | 1.1661 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3158 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/meter-context-lowres |
+| git_commit | c0d4a5cb2ab7a1cbae03c46dd4b33363d2706921 |
 | git_dirty | true |
 
 ## exp_beat_plus_downbeat_logits
@@ -123,6 +211,34 @@ Runs: 6
 | resume | - |
 | git_branch | exp/meter-classification |
 | git_commit | e74e83453e2b230a4b905351083d26bc3a45b53d |
+| git_dirty | true |
+
+## exp_meter_downbeat_conditioning_w0_05
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_downbeat_conditioning_w0_05 |
+| status | complete |
+| best_epoch | 18 |
+| best_downbeat_f1 | 0.3248 |
+| best_beat_f1 | 0.5252 |
+| best_val_loss | 1.0562 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3090 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/meter-downbeat-conditioning |
+| git_commit | 8af5e0224aad55ca3e419c04bc182d2e86acb6b0 |
 | git_dirty | true |
 
 ## beat_transcription
