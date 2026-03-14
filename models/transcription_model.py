@@ -239,6 +239,7 @@ class BeatTranscriptionOutput:
     beat_logits: torch.Tensor
     downbeat_logits: torch.Tensor
     meter_logits: Optional[torch.Tensor] = None
+    beat_phase_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -409,6 +410,7 @@ class BeatDownbeatHead(nn.Module):
         self,
         input_dim: int,
         num_meter_classes: int,
+        num_beat_phase_classes: int = 0,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -418,6 +420,12 @@ class BeatDownbeatHead(nn.Module):
         self.downbeat_head = nn.Linear(input_dim, 1)
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
+        # beat phase は「今が小節内の何拍目か」を表す補助タスク。
+        self.beat_phase_head = (
+            None
+            if num_beat_phase_classes <= 0
+            else nn.Linear(input_dim, num_beat_phase_classes)
+        )
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
@@ -428,6 +436,9 @@ class BeatDownbeatHead(nn.Module):
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
         beat_logits = beat_logits + downbeat_logits
         meter_logits = self.meter_head(x)
+        beat_phase_logits = (
+            None if self.beat_phase_head is None else self.beat_phase_head(x)
+        )
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -435,6 +446,7 @@ class BeatDownbeatHead(nn.Module):
             beat_logits=beat_logits,
             downbeat_logits=downbeat_logits,
             meter_logits=meter_logits,
+            beat_phase_logits=beat_phase_logits,
         )
 
 
@@ -448,6 +460,7 @@ class BeatTranscriptionModel(nn.Module):
         self,
         backbone: Backbone,
         num_meter_classes: int,
+        num_beat_phase_classes: int = 0,
         head_dropout: float = 0.0,
     ):
         super().__init__()
@@ -455,6 +468,7 @@ class BeatTranscriptionModel(nn.Module):
         self.head = BeatDownbeatHead(
             backbone.output_dim,
             num_meter_classes=num_meter_classes,
+            num_beat_phase_classes=num_beat_phase_classes,
             dropout=head_dropout,
         )
 

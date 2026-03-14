@@ -38,6 +38,13 @@ class MeterAnnotation:
     meter_label: str
 
 
+@dataclass(frozen=True)
+class BeatPhaseAnnotation:
+    start_sec: float
+    end_sec: float
+    phase_label: str
+
+
 @dataclass
 class SongEntry:
     song_id: str
@@ -52,6 +59,7 @@ class SongEntry:
     beat_times: torch.Tensor
     downbeat_times: torch.Tensor
     meter_annotations: tuple[MeterAnnotation, ...]
+    beat_phase_annotations: tuple[BeatPhaseAnnotation, ...]
     packed_variants: Dict[int, "PackedAudioEntry"] = field(default_factory=dict)
 
 
@@ -105,17 +113,28 @@ def _meter_label_sort_key(meter_label: str) -> tuple[int, int]:
     return int(numerator), int(denominator)
 
 
-def derive_beat_downbeat_and_meter_annotations(
+def _phase_label_sort_key(phase_label: str) -> int:
+    return int(phase_label)
+
+
+def derive_beat_downbeat_meter_phase_annotations(
     annotation_path: Path,
-) -> tuple[torch.Tensor, torch.Tensor, float, tuple[MeterAnnotation, ...]]:
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    float,
+    tuple[MeterAnnotation, ...],
+    tuple[BeatPhaseAnnotation, ...],
+]:
     measures = _parse_annotation_file(annotation_path)
     if not measures:
         empty = torch.empty(0, dtype=torch.float32)
-        return empty, empty, 0.0, tuple()
+        return empty, empty, 0.0, tuple(), tuple()
 
     beat_times: list[float] = []
     downbeat_times: list[float] = []
     meter_annotations: list[MeterAnnotation] = []
+    beat_phase_annotations: list[BeatPhaseAnnotation] = []
     previous_quarter_sec: Optional[float] = None
     song_end_sec = 0.0
 
@@ -164,7 +183,18 @@ def derive_beat_downbeat_and_meter_annotations(
         downbeat_times.append(measure.downbeat_sec)
         # downbeat も beat に含めたいので、小節頭から等間隔で beat を並べる。
         for beat_index in range(beat_count):
-            beat_times.append(measure.downbeat_sec + (beat_index * step_sec))
+            beat_start_sec = measure.downbeat_sec + (beat_index * step_sec)
+            beat_end_sec = beat_start_sec + step_sec
+            beat_times.append(beat_start_sec)
+            # beat phase は「今が小節内の何拍目か」を表す補助ラベル。
+            # 各 beat 区間全体へ 1, 2, 3... を貼る。
+            beat_phase_annotations.append(
+                BeatPhaseAnnotation(
+                    start_sec=beat_start_sec,
+                    end_sec=beat_end_sec,
+                    phase_label=str(beat_index + 1),
+                )
+            )
 
     beat_tensor = torch.tensor(beat_times, dtype=torch.float32)
     downbeat_tensor = torch.tensor(downbeat_times, dtype=torch.float32)
@@ -173,12 +203,13 @@ def derive_beat_downbeat_and_meter_annotations(
         downbeat_tensor,
         float(song_end_sec),
         tuple(meter_annotations),
+        tuple(beat_phase_annotations),
     )
 
 
 def derive_beat_and_downbeat_times(annotation_path: Path) -> tuple[torch.Tensor, torch.Tensor, float]:
-    beat_tensor, downbeat_tensor, song_end_sec, _ = (
-        derive_beat_downbeat_and_meter_annotations(annotation_path)
+    beat_tensor, downbeat_tensor, song_end_sec, _, _ = (
+        derive_beat_downbeat_meter_phase_annotations(annotation_path)
     )
     return beat_tensor, downbeat_tensor, song_end_sec
 
@@ -282,6 +313,7 @@ class BeatStemDataset(Dataset):
         audio_backend: str = "wav",
         packed_audio_dir: Optional[str | Path] = None,
         meter_to_index: Optional[Dict[str, int]] = None,
+        beat_phase_to_index: Optional[Dict[str, int]] = None,
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
     ) -> None:
@@ -305,6 +337,7 @@ class BeatStemDataset(Dataset):
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
         self.meter_ignore_index = -100
+        self.beat_phase_ignore_index = -100
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
@@ -422,7 +455,8 @@ class BeatStemDataset(Dataset):
                 downbeat_times,
                 label_duration_sec,
                 meter_annotations,
-            ) = derive_beat_downbeat_and_meter_annotations(annotation_path)
+                beat_phase_annotations,
+            ) = derive_beat_downbeat_meter_phase_annotations(annotation_path)
             effective_duration_sec = min(audio_duration_sec, label_duration_sec) if label_duration_sec > 0 else audio_duration_sec
             if effective_duration_sec <= 0:
                 continue
@@ -441,6 +475,7 @@ class BeatStemDataset(Dataset):
                     beat_times=beat_times,
                     downbeat_times=downbeat_times,
                     meter_annotations=meter_annotations,
+                    beat_phase_annotations=beat_phase_annotations,
                     packed_variants=packed_variants,
                 )
             )
@@ -515,6 +550,54 @@ class BeatStemDataset(Dataset):
         self.meter_to_index = resolved_meter_to_index
         self.num_meter_classes = len(self.meter_labels)
         self.meter_class_counts = self._compute_meter_class_counts()
+
+        detected_phase_labels = {
+            beat_phase_annotation.phase_label
+            for song in self.songs
+            for beat_phase_annotation in song.beat_phase_annotations
+        }
+        if not detected_phase_labels:
+            raise ValueError("No beat phase labels found in the loaded annotations")
+
+        if beat_phase_to_index is None:
+            beat_phase_labels = tuple(
+                sorted(detected_phase_labels, key=_phase_label_sort_key)
+            )
+            resolved_beat_phase_to_index = {
+                phase_label: index
+                for index, phase_label in enumerate(beat_phase_labels)
+            }
+        else:
+            resolved_beat_phase_to_index = {
+                str(phase_label): int(index)
+                for phase_label, index in beat_phase_to_index.items()
+            }
+            expected_indices = set(range(len(resolved_beat_phase_to_index)))
+            if set(resolved_beat_phase_to_index.values()) != expected_indices:
+                raise ValueError(
+                    "beat_phase_to_index must map classes to a contiguous index range"
+                )
+            missing_phase_labels = sorted(
+                detected_phase_labels.difference(resolved_beat_phase_to_index),
+                key=_phase_label_sort_key,
+            )
+            if missing_phase_labels:
+                raise ValueError(
+                    "beat_phase_to_index is missing classes required by the dataset: "
+                    + ", ".join(missing_phase_labels)
+                )
+            beat_phase_labels = tuple(
+                phase_label
+                for phase_label, _ in sorted(
+                    resolved_beat_phase_to_index.items(),
+                    key=lambda item: item[1],
+                )
+            )
+
+        self.beat_phase_labels = beat_phase_labels
+        self.beat_phase_to_index = resolved_beat_phase_to_index
+        self.num_beat_phase_classes = len(self.beat_phase_labels)
+        self.beat_phase_class_counts = self._compute_beat_phase_class_counts()
 
     def __len__(self) -> int:
         if self.samples_per_epoch is not None:
@@ -763,6 +846,75 @@ class BeatStemDataset(Dataset):
             )
         return class_counts
 
+    def _beat_phase_annotations_to_frame_targets(
+        self,
+        song: SongEntry,
+        start_sec: float,
+        target_num_frames: int,
+        valid_frames: int,
+    ) -> torch.Tensor:
+        targets = torch.full(
+            (target_num_frames,),
+            fill_value=self.beat_phase_ignore_index,
+            dtype=torch.long,
+        )
+        if valid_frames <= 0:
+            return targets
+
+        labeled_duration_sec = valid_frames * self.hop_length / self.sample_rate
+        frame_scale = self.sample_rate / self.hop_length
+        for beat_phase_annotation in song.beat_phase_annotations:
+            relative_start_sec = beat_phase_annotation.start_sec - start_sec
+            relative_end_sec = beat_phase_annotation.end_sec - start_sec
+            if relative_end_sec <= 0.0 or relative_start_sec >= labeled_duration_sec:
+                continue
+
+            clipped_start_sec = max(relative_start_sec, 0.0)
+            clipped_end_sec = min(relative_end_sec, labeled_duration_sec)
+            # phase も beat 点だけではなく、その拍区間全体へ貼る。
+            frame_start = int(math.ceil((clipped_start_sec * frame_scale) - 1e-8))
+            frame_end = int(math.ceil((clipped_end_sec * frame_scale) - 1e-8))
+            frame_start = min(max(frame_start, 0), valid_frames)
+            frame_end = min(max(frame_end, 0), valid_frames)
+            if frame_end <= frame_start:
+                continue
+
+            phase_index = self.beat_phase_to_index.get(beat_phase_annotation.phase_label)
+            if phase_index is None:
+                raise ValueError(
+                    f"Unknown beat phase label {beat_phase_annotation.phase_label} for song {song.song_id}"
+                )
+            targets[frame_start:frame_end] = phase_index
+        return targets
+
+    def _compute_beat_phase_class_counts(self) -> torch.Tensor:
+        class_counts = torch.zeros(self.num_beat_phase_classes, dtype=torch.long)
+        for song in self.songs:
+            valid_samples = int(round(song.effective_duration_sec * self.sample_rate))
+            if valid_samples < self.n_fft:
+                continue
+
+            valid_frames = 1 + ((valid_samples - self.n_fft) // self.hop_length)
+            if valid_frames <= 0:
+                continue
+
+            phase_targets = self._beat_phase_annotations_to_frame_targets(
+                song=song,
+                start_sec=0.0,
+                target_num_frames=valid_frames,
+                valid_frames=valid_frames,
+            )
+            labeled_targets = phase_targets[
+                phase_targets != self.beat_phase_ignore_index
+            ]
+            if labeled_targets.numel() == 0:
+                continue
+
+            class_counts += torch.bincount(
+                labeled_targets, minlength=self.num_beat_phase_classes
+            )
+        return class_counts
+
     def make_sample(
         self,
         song: SongEntry,
@@ -806,12 +958,19 @@ class BeatStemDataset(Dataset):
             target_num_frames=self.target_num_frames,
             valid_frames=valid_frames,
         )
+        beat_phase_targets = self._beat_phase_annotations_to_frame_targets(
+            song=song,
+            start_sec=start_sec,
+            target_num_frames=self.target_num_frames,
+            valid_frames=valid_frames,
+        )
 
         return {
             "waveform": waveform,
             "beat_targets": beat_targets,
             "downbeat_targets": downbeat_targets,
             "meter_targets": meter_targets,
+            "beat_phase_targets": beat_phase_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

@@ -32,6 +32,7 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
+from training.augmentations import apply_ranked_stem_dropout
 from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss
 
 
@@ -246,7 +247,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
+    parser.add_argument("--beat-phase-loss-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--stem-dropout-max-count",
+        type=int,
+        default=4,
+        help="train 時にエネルギーの小さい stem から最大何本まで落とすか。0 で無効。",
+    )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -400,6 +408,7 @@ def build_dataloaders(
         audio_backend=args.audio_backend,
         packed_audio_dir=args.packed_audio_dir,
         meter_to_index=train_dataset.meter_to_index,
+        beat_phase_to_index=train_dataset.beat_phase_to_index,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
     )
@@ -451,6 +460,7 @@ def build_model(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=train_dataset.num_meter_classes,
+        num_beat_phase_classes=train_dataset.num_beat_phase_classes,
         head_dropout=args.head_dropout,
     )
 
@@ -641,7 +651,9 @@ def compute_loss(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    beat_phase_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    beat_phase_loss_weight: float,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if output.meter_logits is None:
         raise ValueError("Model output must include meter_logits")
@@ -670,8 +682,30 @@ def compute_loss(
     else:
         meter_accuracy = 0.0
 
-    # 今回は重みづけを増やさず、3 タスクの和をそのまま最適化する。
-    total_loss = beat_loss + downbeat_loss + meter_loss
+    if output.beat_phase_logits is None:
+        raise ValueError("Model output must include beat_phase_logits")
+
+    raw_beat_phase_loss = beat_phase_loss_fn(
+        output.beat_phase_logits, batch["beat_phase_targets"]
+    )
+    beat_phase_loss = raw_beat_phase_loss * beat_phase_loss_weight
+    valid_beat_phase = batch["beat_phase_targets"] != beat_phase_loss_fn.ignore_index
+    if bool(valid_beat_phase.any()):
+        beat_phase_predictions = output.beat_phase_logits.argmax(dim=-1)
+        beat_phase_accuracy = float(
+            (
+                beat_phase_predictions[valid_beat_phase]
+                == batch["beat_phase_targets"][valid_beat_phase]
+            )
+            .float()
+            .mean()
+            .detach()
+        )
+    else:
+        beat_phase_accuracy = 0.0
+
+    # phase も meter と同じ補助タスクとして足し込む。
+    total_loss = beat_loss + downbeat_loss + meter_loss + beat_phase_loss
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
@@ -679,6 +713,9 @@ def compute_loss(
         "meter_loss": float(meter_loss.detach()),
         "raw_meter_loss": float(raw_meter_loss.detach()),
         "meter_accuracy": meter_accuracy,
+        "beat_phase_loss": float(beat_phase_loss.detach()),
+        "raw_beat_phase_loss": float(raw_beat_phase_loss.detach()),
+        "beat_phase_accuracy": beat_phase_accuracy,
     }
 
 
@@ -778,7 +815,11 @@ def train_one_epoch(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    beat_phase_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    beat_phase_loss_weight: float,
+    num_stems: int,
+    stem_dropout_max_count: int,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -800,6 +841,16 @@ def train_one_epoch(
         batch = move_batch_to_device(batch, device)
         optimizer.zero_grad(set_to_none=True)
 
+        # 低エネルギー stem から順に落とし、1 stem は必ず残す。
+        dropped_stem_count = 0.0
+        if stem_dropout_max_count > 0:
+            batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
+                batch["waveform"],
+                num_stems=num_stems,
+                max_dropout_stems=stem_dropout_max_count,
+            )
+            dropped_stem_count = float(dropped_counts.float().mean().item())
+
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
             if use_amp and device.type == "cuda"
@@ -812,8 +863,11 @@ def train_one_epoch(
                 beat_loss_fn,
                 downbeat_loss_fn,
                 meter_loss_fn,
+                beat_phase_loss_fn,
                 meter_loss_weight,
+                beat_phase_loss_weight,
             )
+            loss_info["stem_dropout_count"] = dropped_stem_count
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -857,8 +911,28 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/beat_phase_loss",
+                loss_info["beat_phase_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/beat_phase_accuracy",
+                loss_info["beat_phase_accuracy"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/raw_meter_loss",
                 loss_info["raw_meter_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_beat_phase_loss",
+                loss_info["raw_beat_phase_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/stem_dropout_count",
+                loss_info["stem_dropout_count"],
                 global_step,
             )
             writer.add_scalar(
@@ -871,6 +945,7 @@ def train_one_epoch(
                 beat=f"{loss_info['beat_loss']:.4f}",
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
+                phase=f"{loss_info['beat_phase_loss']:.4f}",
             )
 
     return tracker.averages(), global_step
@@ -883,7 +958,9 @@ def validate(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    beat_phase_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    beat_phase_loss_weight: float,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -926,7 +1003,9 @@ def validate(
             beat_loss_fn,
             downbeat_loss_fn,
             meter_loss_fn,
+            beat_phase_loss_fn,
             meter_loss_weight,
+            beat_phase_loss_weight,
         )
 
         tracker.update(loss_info)
@@ -1086,6 +1165,10 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "meter_loss",
         "raw_meter_loss",
         "meter_accuracy",
+        "beat_phase_loss",
+        "raw_beat_phase_loss",
+        "beat_phase_accuracy",
+        "stem_dropout_count",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1143,6 +1226,10 @@ def main() -> None:
         class_counts=train_dataset.meter_class_counts,
         ignore_index=train_dataset.meter_ignore_index,
     ).to(device)
+    beat_phase_loss_fn = BalancedSoftmaxLoss(
+        class_counts=train_dataset.beat_phase_class_counts,
+        ignore_index=train_dataset.beat_phase_ignore_index,
+    ).to(device)
 
     history_path = args.output_dir / "history.jsonl"
     best_downbeat_f1 = -1.0
@@ -1176,6 +1263,8 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "beat_phase_labels": list(train_dataset.beat_phase_labels),
+            "beat_phase_class_counts": train_dataset.beat_phase_class_counts.tolist(),
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1198,8 +1287,15 @@ def main() -> None:
         f"classes={train_dataset.num_meter_classes}, "
         f"labels={list(train_dataset.meter_labels)}"
     )
+    print(
+        "beat_phase="
+        f"classes={train_dataset.num_beat_phase_classes}, "
+        f"labels={list(train_dataset.beat_phase_labels)}"
+    )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(f"beat_phase_loss_weight={args.beat_phase_loss_weight}")
+    print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1243,7 +1339,11 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                beat_phase_loss_fn=beat_phase_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                beat_phase_loss_weight=args.beat_phase_loss_weight,
+                num_stems=len(train_dataset.stem_names),
+                stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
@@ -1259,7 +1359,9 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                beat_phase_loss_fn=beat_phase_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                beat_phase_loss_weight=args.beat_phase_loss_weight,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,

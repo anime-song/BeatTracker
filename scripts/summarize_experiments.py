@@ -27,6 +27,7 @@ class ExperimentSummary:
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
+    beat_phase_loss_weight: Optional[float]
     init_scope: Optional[str]
     init_from: Optional[str]
     init_state_source: Optional[str]
@@ -69,6 +70,9 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
+            "beat_phase_loss_weight": _format_float(
+                self.beat_phase_loss_weight, digits=3
+            ),
             "init_scope": self.init_scope or "",
             "init_from": self.init_from or "",
             "init_state_source": self.init_state_source or "",
@@ -228,6 +232,7 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         train_samples_per_epoch=_as_int(config.get("train_samples_per_epoch")),
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
+        beat_phase_loss_weight=_as_float(config.get("beat_phase_loss_weight")),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
         init_state_source=str(config["init_state_source"])
@@ -288,6 +293,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "train_samples_per_epoch",
         "segment_seconds",
         "meter_loss_weight",
+        "beat_phase_loss_weight",
         "init_scope",
         "init_from",
         "init_state_source",
@@ -342,6 +348,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_float(summary.lr, digits=6) or "-",
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
+            _format_float(summary.beat_phase_loss_weight, digits=3) or "-",
             (
                 summary.init_scope
                 if summary.init_state_source is None
@@ -366,6 +373,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "lr",
                 "batch",
                 "meter_w",
+                "phase_w",
                 "init",
                 "model",
                 "branch",
@@ -415,6 +423,11 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         [
                             "meter_loss_weight",
                             _format_float(summary.meter_loss_weight, digits=3) or "-",
+                        ],
+                        [
+                            "beat_phase_loss_weight",
+                            _format_float(summary.beat_phase_loss_weight, digits=3)
+                            or "-",
                         ],
                         ["init_scope", summary.init_scope or "-"],
                         ["init_from", summary.init_from or "-"],

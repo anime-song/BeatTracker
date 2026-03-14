@@ -194,6 +194,20 @@ def infer_num_meter_classes(
     return int(weight.shape[0])
 
 
+def infer_num_beat_phase_classes(
+    state_dict: dict[str, torch.Tensor], config: dict[str, object]
+) -> int:
+    beat_phase_labels = config.get("beat_phase_labels")
+    if isinstance(beat_phase_labels, list):
+        return len(beat_phase_labels)
+
+    weight = state_dict.get("head.beat_phase_head.weight")
+    if weight is None or weight.ndim != 2:
+        # 古い checkpoint には phase head が無いので、その場合は 0 とみなす。
+        return 0
+    return int(weight.shape[0])
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -462,6 +476,7 @@ def build_model_from_config(
     num_audio_channels: int,
     num_stems: int,
     num_meter_classes: int,
+    num_beat_phase_classes: int,
 ) -> BeatTranscriptionModel:
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=int(config["sample_rate"]),
@@ -484,6 +499,7 @@ def build_model_from_config(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=num_meter_classes,
+        num_beat_phase_classes=num_beat_phase_classes,
         head_dropout=float(config.get("head_dropout", 0.0)),
     )
 
@@ -888,11 +904,13 @@ def main() -> None:
         )
 
     num_meter_classes = infer_num_meter_classes(state_dict, config)
+    num_beat_phase_classes = infer_num_beat_phase_classes(state_dict, config)
     model = build_model_from_config(
         config=config,
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
         num_stems=len(args.stem_names),
         num_meter_classes=num_meter_classes,
+        num_beat_phase_classes=num_beat_phase_classes,
     )
     model.load_state_dict(state_dict, strict=True)
 
