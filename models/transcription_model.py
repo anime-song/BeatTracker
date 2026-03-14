@@ -241,7 +241,7 @@ class BeatTranscriptionOutput:
     meter_logits: Optional[torch.Tensor] = None
     broadband_flux_logits: Optional[torch.Tensor] = None
     onset_env_logits: Optional[torch.Tensor] = None
-    bass_low_flux_logits: Optional[torch.Tensor] = None
+    bass_aux_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -420,15 +420,25 @@ class DrumAuxHead(nn.Module):
 
 class BassAuxHead(nn.Module):
     """
-    bass stem 由来の low-band flux を回帰する小さな head。
+    bass stem 由来の補助系列を回帰する小さな head。
     """
 
-    def __init__(self, input_dim: int):
+    def __init__(self, input_dim: int, target_mode: str):
         super().__init__()
-        self.low_band_flux = nn.Linear(input_dim, 1)
+        self.target_mode = str(target_mode)
+        if self.target_mode == "low_band_flux":
+            self.low_band_flux = nn.Linear(input_dim, 1)
+        elif self.target_mode == "harmonic_change":
+            self.harmonic_change = nn.Linear(input_dim, 1)
+        else:
+            raise ValueError(
+                "target_mode must be 'low_band_flux' or 'harmonic_change'"
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.low_band_flux(x).squeeze(-1)
+        if self.target_mode == "low_band_flux":
+            return self.low_band_flux(x).squeeze(-1)
+        return self.harmonic_change(x).squeeze(-1)
 
 
 class BeatDownbeatHead(nn.Module):
@@ -442,6 +452,7 @@ class BeatDownbeatHead(nn.Module):
         num_meter_classes: int,
         use_drum_aux_head: bool = False,
         use_bass_aux_head: bool = False,
+        bass_aux_target_mode: str = "harmonic_change",
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -452,7 +463,11 @@ class BeatDownbeatHead(nn.Module):
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
         self.drum_aux_head = DrumAuxHead(input_dim) if use_drum_aux_head else None
-        self.bass_aux_head = BassAuxHead(input_dim) if use_bass_aux_head else None
+        self.bass_aux_head = (
+            BassAuxHead(input_dim, target_mode=bass_aux_target_mode)
+            if use_bass_aux_head
+            else None
+        )
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
@@ -469,9 +484,9 @@ class BeatDownbeatHead(nn.Module):
         else:
             broadband_flux_logits, onset_env_logits = self.drum_aux_head(x)
         if self.bass_aux_head is None:
-            bass_low_flux_logits = None
+            bass_aux_logits = None
         else:
-            bass_low_flux_logits = self.bass_aux_head(x)
+            bass_aux_logits = self.bass_aux_head(x)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -481,7 +496,7 @@ class BeatDownbeatHead(nn.Module):
             meter_logits=meter_logits,
             broadband_flux_logits=broadband_flux_logits,
             onset_env_logits=onset_env_logits,
-            bass_low_flux_logits=bass_low_flux_logits,
+            bass_aux_logits=bass_aux_logits,
         )
 
 
@@ -497,6 +512,7 @@ class BeatTranscriptionModel(nn.Module):
         num_meter_classes: int,
         use_drum_aux_head: bool = False,
         use_bass_aux_head: bool = False,
+        bass_aux_target_mode: str = "harmonic_change",
         head_dropout: float = 0.0,
     ):
         super().__init__()
@@ -506,6 +522,7 @@ class BeatTranscriptionModel(nn.Module):
             num_meter_classes=num_meter_classes,
             use_drum_aux_head=use_drum_aux_head,
             use_bass_aux_head=use_bass_aux_head,
+            bass_aux_target_mode=bass_aux_target_mode,
             dropout=head_dropout,
         )
 

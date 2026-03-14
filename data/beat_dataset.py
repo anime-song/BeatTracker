@@ -284,6 +284,7 @@ class BeatStemDataset(Dataset):
         audio_backend: str = "wav",
         packed_audio_dir: Optional[str | Path] = None,
         meter_to_index: Optional[Dict[str, int]] = None,
+        bass_aux_target_mode: str = "harmonic_change",
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
     ) -> None:
@@ -306,6 +307,7 @@ class BeatStemDataset(Dataset):
         self.include_original = include_original
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
+        self.bass_aux_target_mode = str(bass_aux_target_mode)
         self.meter_ignore_index = -100
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
@@ -476,6 +478,7 @@ class BeatStemDataset(Dataset):
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             target_num_frames=self.target_num_frames,
+            bass_aux_target_mode=self.bass_aux_target_mode,
         )
 
         self.songs = songs
@@ -829,7 +832,7 @@ class BeatStemDataset(Dataset):
             "meter_targets": meter_targets,
             "broadband_flux_targets": aux_targets.broadband_flux_targets,
             "onset_env_targets": aux_targets.onset_env_targets,
-            "bass_low_flux_targets": aux_targets.bass_low_flux_targets,
+            "bass_aux_targets": aux_targets.bass_aux_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

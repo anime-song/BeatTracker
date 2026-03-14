@@ -258,7 +258,14 @@ def parse_args() -> argparse.Namespace:
         "--bass-aux-loss-weight",
         type=float,
         default=0.1,
-        help="bass stem から作った low-band flux / harmonic change 補助回帰 loss の重み。",
+        help="bass stem から作った補助系列の回帰 loss の重み。",
+    )
+    parser.add_argument(
+        "--bass-aux-target-mode",
+        type=str,
+        choices=("low_band_flux", "harmonic_change"),
+        default="harmonic_change",
+        help="bass auxiliary target の種類。",
     )
     parser.add_argument(
         "--stem-dropout-max-count",
@@ -407,6 +414,7 @@ def build_dataloaders(
         packed_audio_dir=args.packed_audio_dir,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
+        bass_aux_target_mode=args.bass_aux_target_mode,
     )
     val_base_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
@@ -421,6 +429,7 @@ def build_dataloaders(
         meter_to_index=train_dataset.meter_to_index,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
+        bass_aux_target_mode=args.bass_aux_target_mode,
     )
     val_dataset = ValidationSegmentDataset(val_base_dataset, semitone=None)
 
@@ -472,6 +481,7 @@ def build_model(
         num_meter_classes=train_dataset.num_meter_classes,
         use_drum_aux_head=args.drum_aux_loss_weight > 0.0,
         use_bass_aux_head=args.bass_aux_loss_weight > 0.0,
+        bass_aux_target_mode=args.bass_aux_target_mode,
         head_dropout=args.head_dropout,
     )
 
@@ -718,19 +728,19 @@ def compute_loss(
     drum_aux_loss = raw_drum_aux_loss * drum_aux_loss_weight
 
     raw_bass_aux_loss = beat_loss.new_tensor(0.0)
-    bass_low_flux_loss = beat_loss.new_tensor(0.0)
+    bass_target_loss = beat_loss.new_tensor(0.0)
     if bass_aux_loss_weight > 0.0:
-        if output.bass_low_flux_logits is None:
+        if output.bass_aux_logits is None:
             raise ValueError("Model output must include bass auxiliary logits")
 
         valid_mask = batch["valid_mask"]
-        bass_low_flux_predictions = torch.sigmoid(output.bass_low_flux_logits)
-        bass_low_flux_loss = masked_l1_loss(
-            bass_low_flux_predictions,
-            batch["bass_low_flux_targets"],
+        bass_aux_predictions = torch.sigmoid(output.bass_aux_logits)
+        bass_target_loss = masked_l1_loss(
+            bass_aux_predictions,
+            batch["bass_aux_targets"],
             valid_mask,
         )
-        raw_bass_aux_loss = bass_low_flux_loss
+        raw_bass_aux_loss = bass_target_loss
 
     bass_aux_loss = raw_bass_aux_loss * bass_aux_loss_weight
 
@@ -755,7 +765,7 @@ def compute_loss(
         "onset_env_loss": float(onset_env_loss.detach()),
         "bass_aux_loss": float(bass_aux_loss.detach()),
         "raw_bass_aux_loss": float(raw_bass_aux_loss.detach()),
-        "bass_low_flux_loss": float(bass_low_flux_loss.detach()),
+        "bass_target_loss": float(bass_target_loss.detach()),
     }
 
 
@@ -985,8 +995,8 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
-                "train_step/bass_low_flux_loss",
-                loss_info["bass_low_flux_loss"],
+                "train_step/bass_target_loss",
+                loss_info["bass_target_loss"],
                 global_step,
             )
             writer.add_scalar(
@@ -1231,7 +1241,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "onset_env_loss",
         "bass_aux_loss",
         "raw_bass_aux_loss",
-        "bass_low_flux_loss",
+        "bass_target_loss",
         "stem_dropout_count",
         "beat_precision",
         "beat_recall",
@@ -1325,6 +1335,7 @@ def main() -> None:
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
             "use_bass_aux_head": args.bass_aux_loss_weight > 0.0,
+            "bass_aux_target_mode": args.bass_aux_target_mode,
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1351,6 +1362,7 @@ def main() -> None:
     print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(f"bass_aux_loss_weight={args.bass_aux_loss_weight}")
+    print(f"bass_aux_target_mode={args.bass_aux_target_mode}")
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")

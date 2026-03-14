@@ -221,6 +221,21 @@ def infer_use_bass_aux_head(
     )
 
 
+def infer_bass_aux_target_mode(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> str:
+    if config.get("bass_aux_target_mode") in {"low_band_flux", "harmonic_change"}:
+        return str(config["bass_aux_target_mode"])
+
+    if any(
+        key.startswith("head.bass_aux_head.harmonic_change.")
+        for key in state_dict.keys()
+    ):
+        return "harmonic_change"
+    return "low_band_flux"
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -491,6 +506,7 @@ def build_model_from_config(
     num_meter_classes: int,
     use_drum_aux_head: bool,
     use_bass_aux_head: bool,
+    bass_aux_target_mode: str,
 ) -> BeatTranscriptionModel:
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=int(config["sample_rate"]),
@@ -515,6 +531,7 @@ def build_model_from_config(
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
         use_bass_aux_head=use_bass_aux_head,
+        bass_aux_target_mode=bass_aux_target_mode,
         head_dropout=float(config.get("head_dropout", 0.0)),
     )
 
@@ -921,6 +938,7 @@ def main() -> None:
     num_meter_classes = infer_num_meter_classes(state_dict, config)
     use_drum_aux_head = infer_use_drum_aux_head(state_dict, config)
     use_bass_aux_head = infer_use_bass_aux_head(state_dict, config)
+    bass_aux_target_mode = infer_bass_aux_target_mode(state_dict, config)
     model = build_model_from_config(
         config=config,
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
@@ -928,6 +946,7 @@ def main() -> None:
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
         use_bass_aux_head=use_bass_aux_head,
+        bass_aux_target_mode=bass_aux_target_mode,
     )
     model.load_state_dict(state_dict, strict=True)
 

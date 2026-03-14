@@ -36,7 +36,7 @@ def _smooth_1d_series(x: torch.Tensor, kernel_size: int = 5) -> torch.Tensor:
 class StemAuxTargets:
     broadband_flux_targets: torch.Tensor
     onset_env_targets: torch.Tensor
-    bass_low_flux_targets: torch.Tensor
+    bass_aux_targets: torch.Tensor
 
 
 class StemAuxTargetBuilder:
@@ -55,6 +55,7 @@ class StemAuxTargetBuilder:
         n_fft: int,
         hop_length: int,
         target_num_frames: int,
+        bass_aux_target_mode: str = "harmonic_change",
     ) -> None:
         self.stem_names = tuple(stem_names)
         self.channels_per_stem = int(channels_per_stem)
@@ -62,6 +63,7 @@ class StemAuxTargetBuilder:
         self.n_fft = int(n_fft)
         self.hop_length = int(hop_length)
         self.target_num_frames = int(target_num_frames)
+        self.bass_aux_target_mode = str(bass_aux_target_mode)
 
         if "drums" not in self.stem_names:
             raise ValueError("auxiliary targets require a 'drums' stem")
@@ -70,20 +72,24 @@ class StemAuxTargetBuilder:
 
         self.drums_stem_index = self.stem_names.index("drums")
         self.bass_stem_index = self.stem_names.index("bass")
+        if self.bass_aux_target_mode not in {"low_band_flux", "harmonic_change"}:
+            raise ValueError(
+                "bass_aux_target_mode must be 'low_band_flux' or 'harmonic_change'"
+            )
 
     def build(self, waveform: torch.Tensor, valid_frames: int) -> StemAuxTargets:
         broadband_flux_targets, onset_env_targets = self._compute_drum_aux_targets(
             waveform=waveform,
             valid_frames=valid_frames,
         )
-        bass_low_flux_targets = self._compute_bass_aux_targets(
+        bass_aux_targets = self._compute_bass_aux_targets(
             waveform=waveform,
             valid_frames=valid_frames,
         )
         return StemAuxTargets(
             broadband_flux_targets=broadband_flux_targets,
             onset_env_targets=onset_env_targets,
-            bass_low_flux_targets=bass_low_flux_targets,
+            bass_aux_targets=bass_aux_targets,
         )
 
     def _extract_mono_stem(
@@ -127,6 +133,47 @@ class StemAuxTargetBuilder:
             targets[valid_frames:] = 0.0
         return targets
 
+    def _compute_low_band_flux(self, bass_mag: torch.Tensor) -> torch.Tensor:
+        freqs = torch.linspace(
+            0.0,
+            self.sample_rate / 2.0,
+            bass_mag.shape[1],
+            dtype=bass_mag.dtype,
+            device=bass_mag.device,
+        )
+        low_band_mag = bass_mag[:, freqs <= 300.0, :]
+        low_band_diff = F.relu(low_band_mag[:, :, 1:] - low_band_mag[:, :, :-1])
+        low_band_flux = F.pad(low_band_diff.sum(dim=1), (1, 0)).squeeze(0)
+        low_band_flux = _smooth_1d_series(low_band_flux, kernel_size=5)
+        return _minmax_normalize_1d(low_band_flux)
+
+    def _compute_harmonic_change(self, bass_mag: torch.Tensor) -> torch.Tensor:
+        freqs = torch.linspace(
+            0.0,
+            self.sample_rate / 2.0,
+            bass_mag.shape[1],
+            dtype=bass_mag.dtype,
+            device=bass_mag.device,
+        )
+        chroma_mask = (freqs >= 27.5) & (freqs <= 2000.0)
+        chroma_mag = bass_mag[:, chroma_mask, :]
+        chroma_freqs = freqs[chroma_mask].clamp_min(1e-8)
+        midi = 69.0 + (12.0 * torch.log2(chroma_freqs / 440.0))
+        chroma_mapping = F.one_hot(
+            torch.remainder(torch.round(midi), 12).long(),
+            num_classes=12,
+        ).to(dtype=bass_mag.dtype)
+        chroma = torch.einsum("bft,fc->bct", chroma_mag, chroma_mapping)
+        chroma = chroma / (chroma.sum(dim=1, keepdim=True) + 1e-8)
+
+        chroma_diff = chroma[:, :, 1:] - chroma[:, :, :-1]
+        harmonic_change = torch.sqrt(
+            chroma_diff.square().sum(dim=1) + 1e-8
+        ).squeeze(0)
+        harmonic_change = F.pad(harmonic_change, (1, 0))
+        harmonic_change = _smooth_1d_series(harmonic_change, kernel_size=5)
+        return _minmax_normalize_1d(harmonic_change)
+
     def _compute_drum_aux_targets(
         self,
         waveform: torch.Tensor,
@@ -163,7 +210,7 @@ class StemAuxTargetBuilder:
         waveform: torch.Tensor,
         valid_frames: int,
     ) -> torch.Tensor:
-        # bass stem から low-band flux を作る。
+        # bass stem から low-band flux または harmonic change を作る。
         empty = torch.zeros(
             self.target_num_frames,
             dtype=torch.float32,
@@ -177,18 +224,9 @@ class StemAuxTargetBuilder:
             stem_index=self.bass_stem_index,
         )
         bass_mag = self._compute_log_magnitude(bass_waveform)
-        freqs = torch.linspace(
-            0.0,
-            self.sample_rate / 2.0,
-            bass_mag.shape[1],
-            dtype=bass_mag.dtype,
-            device=bass_mag.device,
-        )
+        if self.bass_aux_target_mode == "low_band_flux":
+            bass_aux_targets = self._compute_low_band_flux(bass_mag)
+        else:
+            bass_aux_targets = self._compute_harmonic_change(bass_mag)
 
-        low_band_mag = bass_mag[:, freqs <= 300.0, :]
-        low_band_diff = F.relu(low_band_mag[:, :, 1:] - low_band_mag[:, :, :-1])
-        low_band_flux = F.pad(low_band_diff.sum(dim=1), (1, 0)).squeeze(0)
-        low_band_flux = _smooth_1d_series(low_band_flux, kernel_size=5)
-
-        low_band_flux = _minmax_normalize_1d(low_band_flux)
-        return self._pad_to_target_length(low_band_flux, valid_frames)
+        return self._pad_to_target_length(bass_aux_targets, valid_frames)
