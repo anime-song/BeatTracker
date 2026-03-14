@@ -208,6 +208,19 @@ def infer_use_drum_aux_head(
     )
 
 
+def infer_use_bass_aux_head(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> bool:
+    if "use_bass_aux_head" in config:
+        return bool(config["use_bass_aux_head"])
+
+    return any(
+        key.startswith("head.bass_aux_head.")
+        for key in state_dict.keys()
+    )
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -477,6 +490,7 @@ def build_model_from_config(
     num_stems: int,
     num_meter_classes: int,
     use_drum_aux_head: bool,
+    use_bass_aux_head: bool,
 ) -> BeatTranscriptionModel:
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=int(config["sample_rate"]),
@@ -500,6 +514,7 @@ def build_model_from_config(
         backbone=backbone,
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
+        use_bass_aux_head=use_bass_aux_head,
         head_dropout=float(config.get("head_dropout", 0.0)),
     )
 
@@ -905,12 +920,14 @@ def main() -> None:
 
     num_meter_classes = infer_num_meter_classes(state_dict, config)
     use_drum_aux_head = infer_use_drum_aux_head(state_dict, config)
+    use_bass_aux_head = infer_use_bass_aux_head(state_dict, config)
     model = build_model_from_config(
         config=config,
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
         num_stems=len(args.stem_names),
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
+        use_bass_aux_head=use_bass_aux_head,
     )
     model.load_state_dict(state_dict, strict=True)
 

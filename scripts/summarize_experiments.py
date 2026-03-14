@@ -28,6 +28,7 @@ class ExperimentSummary:
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
     drum_aux_loss_weight: Optional[float]
+    bass_aux_loss_weight: Optional[float]
     stem_dropout_max_count: Optional[int]
     init_scope: Optional[str]
     init_from: Optional[str]
@@ -73,6 +74,9 @@ class ExperimentSummary:
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
             "drum_aux_loss_weight": _format_float(
                 self.drum_aux_loss_weight, digits=3
+            ),
+            "bass_aux_loss_weight": _format_float(
+                self.bass_aux_loss_weight, digits=3
             ),
             "stem_dropout_max_count": _format_int(self.stem_dropout_max_count),
             "init_scope": self.init_scope or "",
@@ -235,6 +239,7 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
         drum_aux_loss_weight=_as_float(config.get("drum_aux_loss_weight")),
+        bass_aux_loss_weight=_as_float(config.get("bass_aux_loss_weight")),
         stem_dropout_max_count=_as_int(config.get("stem_dropout_max_count")),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
@@ -297,6 +302,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "segment_seconds",
         "meter_loss_weight",
         "drum_aux_loss_weight",
+        "bass_aux_loss_weight",
         "stem_dropout_max_count",
         "init_scope",
         "init_from",
@@ -353,6 +359,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
             _format_float(summary.drum_aux_loss_weight, digits=3) or "-",
+            _format_float(summary.bass_aux_loss_weight, digits=3) or "-",
             _format_int(summary.stem_dropout_max_count) or "-",
             (
                 summary.init_scope
@@ -379,6 +386,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "batch",
                 "meter_w",
                 "drum_aux_w",
+                "bass_aux_w",
                 "stem_drop",
                 "init",
                 "model",
@@ -433,6 +441,11 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         [
                             "drum_aux_loss_weight",
                             _format_float(summary.drum_aux_loss_weight, digits=3)
+                            or "-",
+                        ],
+                        [
+                            "bass_aux_loss_weight",
+                            _format_float(summary.bass_aux_loss_weight, digits=3)
                             or "-",
                         ],
                         [
