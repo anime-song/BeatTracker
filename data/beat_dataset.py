@@ -271,6 +271,7 @@ class BeatStemDataset(Dataset):
         dataset_root: str | Path = "dataset/meter_dataset",
         split: Optional[str] = "train",
         segment_seconds: float = 8.0,
+        load_seconds: Optional[float] = None,
         sample_rate: Optional[int] = None,
         hop_length: int = 512,
         n_fft: int = 2048,
@@ -296,7 +297,13 @@ class BeatStemDataset(Dataset):
         self.split_path = self.dataset_root / "single.split"
 
         self.split = split
-        self.segment_seconds = float(segment_seconds)
+        self.requested_segment_seconds = float(segment_seconds)
+        # time stretch で短くなる側を埋めるため、train だけ長めに読むことがある。
+        self.segment_seconds = (
+            float(load_seconds)
+            if load_seconds is not None
+            else self.requested_segment_seconds
+        )
         self.hop_length = int(hop_length)
         self.n_fft = int(n_fft)
         self.stem_names = tuple(stem_names)
@@ -310,6 +317,8 @@ class BeatStemDataset(Dataset):
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
         self._packed_array_cache: OrderedDict[str, np.ndarray] = OrderedDict()
 
+        if self.requested_segment_seconds <= 0:
+            raise ValueError("segment_seconds must be positive")
         if self.segment_seconds <= 0:
             raise ValueError("segment_seconds must be positive")
         if self.hop_length <= 0:

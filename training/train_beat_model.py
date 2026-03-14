@@ -32,6 +32,7 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
+from training.augmentations import apply_batch_time_stretch
 from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss
 
 
@@ -233,7 +234,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--time-stretch-min-percent",
+        type=float,
+        default=-50.0,
+        help="train 時の duration 変化率の下限。-50 なら 0.5 倍に縮める。",
+    )
+    parser.add_argument(
+        "--time-stretch-max-percent",
+        type=float,
+        default=50.0,
+        help="train 時の duration 変化率の上限。50 なら 1.5 倍に伸ばす。",
+    )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -294,16 +307,36 @@ def collect_git_metadata(project_root: Path) -> dict[str, object]:
     }
 
 
+def resolve_train_load_seconds(args: argparse.Namespace) -> float:
+    if args.time_stretch_min_percent > args.time_stretch_max_percent:
+        raise ValueError(
+            "time stretch min percent must be less than or equal to max percent"
+        )
+
+    min_duration_scale = 1.0 + (args.time_stretch_min_percent / 100.0)
+    max_duration_scale = 1.0 + (args.time_stretch_max_percent / 100.0)
+    if min_duration_scale <= 0.0 or max_duration_scale <= 0.0:
+        raise ValueError("time stretch percent must be greater than -100")
+
+    # 短くなる側だけ、事前に長めの crop を読んで埋め合わせる。
+    if min_duration_scale >= 1.0:
+        return float(args.segment_seconds)
+    return float(args.segment_seconds) / min_duration_scale
+
+
 def build_dataloaders(
     args: argparse.Namespace,
 ) -> tuple[BeatStemDataset, DataLoader, DataLoader]:
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
 
+    train_load_seconds = resolve_train_load_seconds(args)
+
     train_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
         split="train",
         segment_seconds=args.segment_seconds,
+        load_seconds=train_load_seconds,
         sample_rate=args.sample_rate,
         hop_length=args.hop_length,
         n_fft=args.n_fft,
@@ -704,6 +737,13 @@ def train_one_epoch(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    time_stretch_min_percent: float,
+    time_stretch_max_percent: float,
+    n_fft: int,
+    hop_length: int,
+    target_samples: int,
+    target_num_frames: int,
+    meter_ignore_index: int,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -723,6 +763,16 @@ def train_one_epoch(
 
     for batch_index, batch in enumerate(progress, start=1):
         batch = move_batch_to_device(batch, device)
+        batch = apply_batch_time_stretch(
+            batch=batch,
+            min_percent=time_stretch_min_percent,
+            max_percent=time_stretch_max_percent,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            target_samples=target_samples,
+            target_num_frames=target_num_frames,
+            meter_ignore_index=meter_ignore_index,
+        )
         optimizer.zero_grad(set_to_none=True)
 
         with (
@@ -1026,6 +1076,7 @@ def main() -> None:
     args = parse_args()
     set_seed(args.seed)
     project_root = Path(__file__).resolve().parent.parent
+    train_load_seconds = resolve_train_load_seconds(args)
 
     device = torch.device(
         args.device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -1035,6 +1086,10 @@ def main() -> None:
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
     train_dataset, train_loader, val_loader = build_dataloaders(args)
+    train_target_samples = int(round(args.segment_seconds * args.sample_rate))
+    train_target_num_frames = 1 + (
+        (train_target_samples - args.n_fft) // args.hop_length
+    )
     model = build_model(args, train_dataset).to(device)
 
     optimizer = torch.optim.AdamW(
@@ -1090,6 +1145,7 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "train_load_seconds": train_load_seconds,
         }
     )
     config_text = json.dumps(config_payload, indent=2, default=str)
@@ -1107,6 +1163,12 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(
+        "time_stretch="
+        f"min_percent={args.time_stretch_min_percent}, "
+        f"max_percent={args.time_stretch_max_percent}, "
+        f"train_load_seconds={train_load_seconds:.2f}"
+    )
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1143,6 +1205,13 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                time_stretch_min_percent=args.time_stretch_min_percent,
+                time_stretch_max_percent=args.time_stretch_max_percent,
+                n_fft=args.n_fft,
+                hop_length=args.hop_length,
+                target_samples=train_target_samples,
+                target_num_frames=train_target_num_frames,
+                meter_ignore_index=train_dataset.meter_ignore_index,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
