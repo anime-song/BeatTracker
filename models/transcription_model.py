@@ -242,7 +242,6 @@ class BeatTranscriptionOutput:
     broadband_flux_logits: Optional[torch.Tensor] = None
     onset_env_logits: Optional[torch.Tensor] = None
     bass_low_flux_logits: Optional[torch.Tensor] = None
-    bass_harmonic_change_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -421,18 +420,15 @@ class DrumAuxHead(nn.Module):
 
 class BassAuxHead(nn.Module):
     """
-    bass stem 由来の補助系列を回帰する小さな head。
+    bass stem 由来の low-band flux を回帰する小さな head。
     """
 
     def __init__(self, input_dim: int):
         super().__init__()
         self.low_band_flux = nn.Linear(input_dim, 1)
-        self.harmonic_change = nn.Linear(input_dim, 1)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        bass_low_flux_logits = self.low_band_flux(x).squeeze(-1)
-        bass_harmonic_change_logits = self.harmonic_change(x).squeeze(-1)
-        return bass_low_flux_logits, bass_harmonic_change_logits
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.low_band_flux(x).squeeze(-1)
 
 
 class BeatDownbeatHead(nn.Module):
@@ -474,9 +470,8 @@ class BeatDownbeatHead(nn.Module):
             broadband_flux_logits, onset_env_logits = self.drum_aux_head(x)
         if self.bass_aux_head is None:
             bass_low_flux_logits = None
-            bass_harmonic_change_logits = None
         else:
-            bass_low_flux_logits, bass_harmonic_change_logits = self.bass_aux_head(x)
+            bass_low_flux_logits = self.bass_aux_head(x)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -487,7 +482,6 @@ class BeatDownbeatHead(nn.Module):
             broadband_flux_logits=broadband_flux_logits,
             onset_env_logits=onset_env_logits,
             bass_low_flux_logits=bass_low_flux_logits,
-            bass_harmonic_change_logits=bass_harmonic_change_logits,
         )
 
 

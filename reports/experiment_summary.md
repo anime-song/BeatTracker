@@ -1,12 +1,13 @@
 # Experiment Summary
 
-Generated: 2026-03-14 12:09:13 UTC
+Generated: 2026-03-14 13:27:35 UTC
 
-Runs: 24
+Runs: 25
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | bass_aux_w | stem_drop | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
+| exp_chord_preinit_stemdrop2_drumaux_basslowflux | complete | 17 | 0.4536 | 30 | 0.4387 | 42 | 0.000300 | 8 | 0.050 | 0.100 | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
 | exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
 | exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | - | - | - | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
 | exp_chord_preinit_stemdrop2_drumaux_bassaux | complete | 20 | 0.4442 | 30 | 0.4281 | 42 | 0.000300 | 8 | 0.050 | 0.100 | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
@@ -63,6 +64,40 @@ Runs: 24
 | resume | - |
 | git_branch | exp/drum-aux-flux-onset |
 | git_commit | f9c10e4c96d429b7ff085d05e21029188377c398 |
+| git_dirty | true |
+
+## exp_chord_preinit_stemdrop2_drumaux_basslowflux
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_basslowflux |
+| status | complete |
+| best_epoch | 17 |
+| best_downbeat_f1 | 0.4536 |
+| best_beat_f1 | 0.6364 |
+| best_val_loss | 1.2103 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4387 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| bass_aux_loss_weight | 0.100 |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/bass-aux-lowflux-harmonic-change |
+| git_commit | adde35d3c2c9fce19fbff1d630b4ddd48e6b5b59 |
 | git_dirty | true |
 
 ## exp_chord_preinit_stemdrop2

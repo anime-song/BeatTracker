@@ -830,7 +830,6 @@ class BeatStemDataset(Dataset):
             "broadband_flux_targets": aux_targets.broadband_flux_targets,
             "onset_env_targets": aux_targets.onset_env_targets,
             "bass_low_flux_targets": aux_targets.bass_low_flux_targets,
-            "bass_harmonic_change_targets": aux_targets.bass_harmonic_change_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

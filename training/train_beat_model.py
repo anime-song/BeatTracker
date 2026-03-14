@@ -719,30 +719,18 @@ def compute_loss(
 
     raw_bass_aux_loss = beat_loss.new_tensor(0.0)
     bass_low_flux_loss = beat_loss.new_tensor(0.0)
-    bass_harmonic_change_loss = beat_loss.new_tensor(0.0)
     if bass_aux_loss_weight > 0.0:
-        if (
-            output.bass_low_flux_logits is None
-            or output.bass_harmonic_change_logits is None
-        ):
+        if output.bass_low_flux_logits is None:
             raise ValueError("Model output must include bass auxiliary logits")
 
         valid_mask = batch["valid_mask"]
         bass_low_flux_predictions = torch.sigmoid(output.bass_low_flux_logits)
-        bass_harmonic_change_predictions = torch.sigmoid(
-            output.bass_harmonic_change_logits
-        )
         bass_low_flux_loss = masked_l1_loss(
             bass_low_flux_predictions,
             batch["bass_low_flux_targets"],
             valid_mask,
         )
-        bass_harmonic_change_loss = masked_l1_loss(
-            bass_harmonic_change_predictions,
-            batch["bass_harmonic_change_targets"],
-            valid_mask,
-        )
-        raw_bass_aux_loss = bass_low_flux_loss + bass_harmonic_change_loss
+        raw_bass_aux_loss = bass_low_flux_loss
 
     bass_aux_loss = raw_bass_aux_loss * bass_aux_loss_weight
 
@@ -768,7 +756,6 @@ def compute_loss(
         "bass_aux_loss": float(bass_aux_loss.detach()),
         "raw_bass_aux_loss": float(raw_bass_aux_loss.detach()),
         "bass_low_flux_loss": float(bass_low_flux_loss.detach()),
-        "bass_harmonic_change_loss": float(bass_harmonic_change_loss.detach()),
     }
 
 
@@ -1000,11 +987,6 @@ def train_one_epoch(
             writer.add_scalar(
                 "train_step/bass_low_flux_loss",
                 loss_info["bass_low_flux_loss"],
-                global_step,
-            )
-            writer.add_scalar(
-                "train_step/bass_harmonic_change_loss",
-                loss_info["bass_harmonic_change_loss"],
                 global_step,
             )
             writer.add_scalar(
@@ -1250,7 +1232,6 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "bass_aux_loss",
         "raw_bass_aux_loss",
         "bass_low_flux_loss",
-        "bass_harmonic_change_loss",
         "stem_dropout_count",
         "beat_precision",
         "beat_recall",
