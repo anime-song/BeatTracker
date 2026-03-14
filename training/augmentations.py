@@ -108,3 +108,65 @@ def apply_batch_time_stretch(batch: dict) -> dict:
 
     batch["audio"] = torch.stack(padded_waves, dim=0)
     return batch
+
+
+@torch.no_grad()
+def apply_ranked_stem_dropout(
+    waveform: torch.Tensor,
+    num_stems: int,
+    max_dropout_stems: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    stem ごとのエネルギーを見て、エネルギーが小さい stem から順に落とす。
+
+    - drop 本数はサンプルごとに 1..max_dropout_stems の範囲でランダム
+    - ただし必ず 1 stem は残す
+    - 一番エネルギーが大きい stem は最後まで残る
+    """
+    if max_dropout_stems <= 0 or num_stems <= 1:
+        batch_size = 1 if waveform.dim() == 2 else waveform.shape[0]
+        dropped_counts = torch.zeros(batch_size, device=waveform.device, dtype=torch.long)
+        return waveform, dropped_counts
+
+    is_unbatched = waveform.dim() == 2
+    if is_unbatched:
+        waveform = waveform.unsqueeze(0)
+
+    batch_size, num_channels, num_samples = waveform.shape
+    if num_channels % num_stems != 0:
+        raise ValueError(
+            f"num_channels ({num_channels}) must be divisible by num_stems ({num_stems})"
+        )
+
+    channels_per_stem = num_channels // num_stems
+    stem_waveform = waveform.view(batch_size, num_stems, channels_per_stem, num_samples)
+
+    # stem ごとの平均二乗エネルギーを使って、落とす優先順位を決める。
+    stem_energy = stem_waveform.square().mean(dim=(2, 3))
+    energy_rank = torch.argsort(stem_energy, dim=1, descending=False)
+
+    max_dropout_stems = min(int(max_dropout_stems), num_stems - 1)
+    dropped_counts = torch.randint(
+        low=1,
+        high=max_dropout_stems + 1,
+        size=(batch_size,),
+        device=waveform.device,
+    )
+
+    # rank が小さい stem ほど先に落とす。
+    rank_index = torch.arange(num_stems, device=waveform.device).unsqueeze(0)
+    drop_by_rank = rank_index < dropped_counts.unsqueeze(1)
+    drop_mask = torch.zeros(
+        batch_size, num_stems, device=waveform.device, dtype=torch.bool
+    )
+    drop_mask.scatter_(1, energy_rank, drop_by_rank)
+
+    kept_stem_mask = (~drop_mask).to(dtype=waveform.dtype).view(
+        batch_size, num_stems, 1, 1
+    )
+    stem_waveform = stem_waveform * kept_stem_mask
+    waveform = stem_waveform.view(batch_size, num_channels, num_samples)
+
+    if is_unbatched:
+        waveform = waveform.squeeze(0)
+    return waveform, dropped_counts

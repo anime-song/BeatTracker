@@ -1,11 +1,12 @@
 # Experiment Summary
 
-Generated: 2026-03-14 04:29:00 UTC
+Generated: 2026-03-14 06:28:14 UTC
 
-Runs: 19
+Runs: 20
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
 | exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
 | exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | - | L6/H64/O256 | exp/meter-classification |
 | exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 | complete | 23 | 0.3743 | 30 | 0.3569 | 42 | 0.000300 | 8 | 0.050 | - | L6/H64/O256 | exp/spec-augment-mask-rate |
@@ -25,6 +26,37 @@ Runs: 19
 | exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | - | L6/H64/O256 | exp/spec-augment-mask-rate |
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | L6/H64/O256 | exp/meter-classification |
+
+## exp_chord_preinit_stemdrop2
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2 |
+| status | complete |
+| best_epoch | 18 |
+| best_downbeat_f1 | 0.4519 |
+| best_beat_f1 | 0.6497 |
+| best_val_loss | 1.1892 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4275 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/stem-dropout-energy-ranking |
+| git_commit | f9c10e4c96d429b7ff085d05e21029188377c398 |
+| git_dirty | true |
 
 ## exp_chord_preinit_backbone
 
