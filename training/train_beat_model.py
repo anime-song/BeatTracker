@@ -208,6 +208,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="checkpoint から optimizer / scheduler / EMA を含めて学習再開する。",
     )
+    parser.add_argument(
+        "--init-from",
+        type=Path,
+        default=None,
+        help="学習初期値として使う checkpoint。resume と違って optimizer は復元しない。",
+    )
+    parser.add_argument(
+        "--init-scope",
+        type=str,
+        choices=("backbone", "matching"),
+        default="backbone",
+        help="init-from でどの重みまで読むか。既定は backbone のみ。",
+    )
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--val-batch-size", type=int, default=8)
@@ -291,6 +304,68 @@ def collect_git_metadata(project_root: Path) -> dict[str, object]:
         "git_commit": commit,
         "git_branch": branch,
         "git_dirty": bool(dirty_output),
+    }
+
+
+def _extract_model_state_dict(
+    checkpoint: object,
+) -> tuple[dict[str, torch.Tensor], str]:
+    if not isinstance(checkpoint, dict):
+        raise ValueError("checkpoint does not contain a valid model state_dict")
+
+    # 学習時に EMA を持っている checkpoint は、初期値としてはこちらを優先する。
+    if "ema_state_dict" in checkpoint:
+        ema_state = checkpoint["ema_state_dict"]
+        if isinstance(ema_state, dict) and "model_state_dict" in ema_state:
+            state_dict = ema_state["model_state_dict"]
+        else:
+            state_dict = ema_state
+
+        if isinstance(state_dict, dict):
+            return state_dict, "ema_state_dict"
+
+    if "model_state_dict" in checkpoint and isinstance(
+        checkpoint["model_state_dict"], dict
+    ):
+        return checkpoint["model_state_dict"], "model_state_dict"
+
+    return checkpoint, "raw_checkpoint"
+
+
+def initialize_model_from_checkpoint(
+    model: BeatTranscriptionModel,
+    checkpoint_path: Path,
+    init_scope: str,
+) -> dict[str, object]:
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    source_state, state_source = _extract_model_state_dict(checkpoint)
+    target_state = model.state_dict()
+
+    filtered_state: dict[str, torch.Tensor] = {}
+    skipped_shape_keys: list[str] = []
+
+    for key, value in source_state.items():
+        if init_scope == "backbone" and not key.startswith("backbone."):
+            continue
+        if key not in target_state:
+            continue
+        if target_state[key].shape != value.shape:
+            skipped_shape_keys.append(key)
+            continue
+        filtered_state[key] = value
+
+    if not filtered_state:
+        raise ValueError(
+            f"No compatible parameters were found in {checkpoint_path} for init_scope={init_scope}"
+        )
+
+    load_result = model.load_state_dict(filtered_state, strict=False)
+    return {
+        "state_source": state_source,
+        "loaded_keys": len(filtered_state),
+        "missing_keys": list(load_result.missing_keys),
+        "unexpected_keys": list(load_result.unexpected_keys),
+        "skipped_shape_keys": skipped_shape_keys,
     }
 
 
@@ -1027,6 +1102,9 @@ def main() -> None:
     set_seed(args.seed)
     project_root = Path(__file__).resolve().parent.parent
 
+    if args.resume is not None and args.init_from is not None:
+        raise ValueError("--resume and --init-from cannot be used together")
+
     device = torch.device(
         args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     )
@@ -1036,6 +1114,14 @@ def main() -> None:
 
     train_dataset, train_loader, val_loader = build_dataloaders(args)
     model = build_model(args, train_dataset).to(device)
+    init_info: Optional[dict[str, object]] = None
+    if args.init_from is not None:
+        # 和音採譜モデルなど別 task の checkpoint は、まず backbone だけ読むのが安全。
+        init_info = initialize_model_from_checkpoint(
+            model=model,
+            checkpoint_path=args.init_from,
+            init_scope=args.init_scope,
+        )
 
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
@@ -1090,6 +1176,13 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "init_state_source": None
+            if init_info is None
+            else init_info["state_source"],
+            "init_loaded_keys": None if init_info is None else init_info["loaded_keys"],
+            "init_skipped_shape_keys": []
+            if init_info is None
+            else init_info["skipped_shape_keys"],
         }
     )
     config_text = json.dumps(config_payload, indent=2, default=str)
@@ -1110,6 +1203,14 @@ def main() -> None:
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
+    if args.init_from is not None:
+        print(
+            "init="
+            f"path={args.init_from}, scope={args.init_scope}, "
+            f"source={init_info['state_source'] if init_info is not None else '-'}, "
+            f"loaded_keys={init_info['loaded_keys'] if init_info is not None else 0}, "
+            f"skipped_shape_keys={len(init_info['skipped_shape_keys']) if init_info is not None else 0}"
+        )
     if args.resume is not None:
         print(
             "resume="

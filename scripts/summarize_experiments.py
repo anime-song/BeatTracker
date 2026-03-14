@@ -27,6 +27,9 @@ class ExperimentSummary:
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
+    init_scope: Optional[str]
+    init_from: Optional[str]
+    init_state_source: Optional[str]
     audio_backend: Optional[str]
     scheduler: Optional[str]
     ema_decay: Optional[float]
@@ -66,6 +69,9 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
+            "init_scope": self.init_scope or "",
+            "init_from": self.init_from or "",
+            "init_state_source": self.init_state_source or "",
             "audio_backend": self.audio_backend or "",
             "scheduler": self.scheduler or "",
             "ema_decay": _format_float(self.ema_decay, digits=4),
@@ -222,6 +228,11 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         train_samples_per_epoch=_as_int(config.get("train_samples_per_epoch")),
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
+        init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
+        init_from=str(config["init_from"]) if config.get("init_from") else None,
+        init_state_source=str(config["init_state_source"])
+        if config.get("init_state_source")
+        else None,
         audio_backend=str(config["audio_backend"]) if "audio_backend" in config else None,
         scheduler=str(config["scheduler"]) if "scheduler" in config else None,
         ema_decay=_as_float(config.get("ema_decay")),
@@ -277,6 +288,9 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "train_samples_per_epoch",
         "segment_seconds",
         "meter_loss_weight",
+        "init_scope",
+        "init_from",
+        "init_state_source",
         "audio_backend",
         "scheduler",
         "ema_decay",
@@ -328,6 +342,12 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_float(summary.lr, digits=6) or "-",
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
+            (
+                summary.init_scope
+                if summary.init_state_source is None
+                else f"{summary.init_scope}:{summary.init_state_source}"
+            )
+            or "-",
             summary.model_tag,
             summary.git_branch or "-",
         ]
@@ -346,6 +366,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "lr",
                 "batch",
                 "meter_w",
+                "init",
                 "model",
                 "branch",
             ],
@@ -395,6 +416,9 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                             "meter_loss_weight",
                             _format_float(summary.meter_loss_weight, digits=3) or "-",
                         ],
+                        ["init_scope", summary.init_scope or "-"],
+                        ["init_from", summary.init_from or "-"],
+                        ["init_state_source", summary.init_state_source or "-"],
                         ["audio_backend", summary.audio_backend or "-"],
                         ["scheduler", summary.scheduler or "-"],
                         ["ema_decay", _format_float(summary.ema_decay) or "-"],

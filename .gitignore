@@ -9,3 +9,5 @@ dataset/**/songs_packed/
 
 # Training outputs
 outputs/*
+
+*.pt
