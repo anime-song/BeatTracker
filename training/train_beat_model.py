@@ -32,6 +32,7 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
+from training.augmentations import apply_ranked_stem_dropout
 from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss
 
 
@@ -246,7 +247,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--meter-balanced-softmax-tau",
+        type=float,
+        default=0.5,
+        help="meter 用 BalancedSoftmaxLoss の tau。今回の実験では 0.5 を既定にする。",
+    )
+    parser.add_argument(
+        "--stem-dropout-max-count",
+        type=int,
+        default=4,
+        help="train 時にエネルギーの小さい stem から最大何本まで落とすか。0 で無効。",
+    )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -779,6 +792,8 @@ def train_one_epoch(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    num_stems: int,
+    stem_dropout_max_count: int,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -800,6 +815,16 @@ def train_one_epoch(
         batch = move_batch_to_device(batch, device)
         optimizer.zero_grad(set_to_none=True)
 
+        # 低エネルギー stem から順に落とし、1 stem は必ず残す。
+        dropped_stem_count = 0.0
+        if stem_dropout_max_count > 0:
+            batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
+                batch["waveform"],
+                num_stems=num_stems,
+                max_dropout_stems=stem_dropout_max_count,
+            )
+            dropped_stem_count = float(dropped_counts.float().mean().item())
+
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
             if use_amp and device.type == "cuda"
@@ -814,6 +839,7 @@ def train_one_epoch(
                 meter_loss_fn,
                 meter_loss_weight,
             )
+            loss_info["stem_dropout_count"] = dropped_stem_count
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -859,6 +885,11 @@ def train_one_epoch(
             writer.add_scalar(
                 "train_step/raw_meter_loss",
                 loss_info["raw_meter_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/stem_dropout_count",
+                loss_info["stem_dropout_count"],
                 global_step,
             )
             writer.add_scalar(
@@ -1086,6 +1117,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "meter_loss",
         "raw_meter_loss",
         "meter_accuracy",
+        "stem_dropout_count",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1141,6 +1173,7 @@ def main() -> None:
     ).to(device)
     meter_loss_fn = BalancedSoftmaxLoss(
         class_counts=train_dataset.meter_class_counts,
+        tau=args.meter_balanced_softmax_tau,
         ignore_index=train_dataset.meter_ignore_index,
     ).to(device)
 
@@ -1200,6 +1233,8 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(f"meter_balanced_softmax_tau={args.meter_balanced_softmax_tau}")
+    print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1244,6 +1279,8 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                num_stems=len(train_dataset.stem_names),
+                stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
