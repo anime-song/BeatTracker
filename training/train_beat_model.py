@@ -228,6 +228,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-layers", type=int, default=6)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--head-dropout", type=float, default=0.1)
+    parser.add_argument(
+        "--spec-augment-freq-mask-rate",
+        type=float,
+        default=0.0,
+        help="SpecAugment で各周波数ビンを独立にランダムマスクする確率。",
+    )
+    parser.add_argument(
+        "--spec-augment-time-mask-rate",
+        type=float,
+        default=0.0,
+        help="SpecAugment で各時間フレームを独立にランダムマスクする確率。",
+    )
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--grad-clip", type=float, default=1.0)
@@ -355,6 +367,22 @@ def build_dataloaders(
 def build_model(
     args: argparse.Namespace, train_dataset: BeatStemDataset
 ) -> BeatTranscriptionModel:
+    if not 0.0 <= args.spec_augment_freq_mask_rate <= 1.0:
+        raise ValueError("spec_augment_freq_mask_rate must be in [0, 1]")
+    if not 0.0 <= args.spec_augment_time_mask_rate <= 1.0:
+        raise ValueError("spec_augment_time_mask_rate must be in [0, 1]")
+
+    spec_augment_params = None
+    if (
+        args.spec_augment_freq_mask_rate > 0.0
+        or args.spec_augment_time_mask_rate > 0.0
+    ):
+        # rate 指定は、連続区間ではなく各軸要素のランダムマスクとして扱う。
+        spec_augment_params = {
+            "freq_mask_rate": args.spec_augment_freq_mask_rate,
+            "time_mask_rate": args.spec_augment_time_mask_rate,
+        }
+
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=args.sample_rate,
         n_fft=args.n_fft,
@@ -363,7 +391,7 @@ def build_model(
         num_stems=len(train_dataset.stem_names),
         bins_per_octave=args.bins_per_octave,
         n_bins=args.n_bins,
-        spec_augment_params=None,
+        spec_augment_params=spec_augment_params,
     )
     backbone = Backbone(
         feature_extractor=feature_extractor,
@@ -1107,6 +1135,11 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(
+        "spec_augment="
+        f"freq_mask_rate={args.spec_augment_freq_mask_rate}, "
+        f"time_mask_rate={args.spec_augment_time_mask_rate}"
+    )
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")

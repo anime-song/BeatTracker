@@ -13,26 +13,24 @@ class SpecAugment(nn.Module):
 
     def __init__(
         self,
-        freq_mask_param: int,
-        time_mask_param: int,
-        num_freq_masks: int = 1,
-        num_time_masks: int = 1,
         p: float = 1.0,
+        freq_mask_rate: float = 0.0,
+        time_mask_rate: float = 0.0,
     ):
         """
         Args:
-            freq_mask_param (int): 周波数マスクの最大幅 (F)
-            time_mask_param (int): 時間マスクの最大幅 (T)
-            num_freq_masks (int): 適用する周波数マスクの数
-            num_time_masks (int): 適用する時間マスクの数
             p (float): Augmentationを適用する確率
+            freq_mask_rate (float): 周波数ビンを独立にランダムマスクする確率
+            time_mask_rate (float): 時間フレームを独立にランダムマスクする確率
         """
         super().__init__()
-        self.freq_mask_param = freq_mask_param
-        self.time_mask_param = time_mask_param
-        self.num_freq_masks = num_freq_masks
-        self.num_time_masks = num_time_masks
         self.p = p
+        if not 0.0 <= freq_mask_rate <= 1.0:
+            raise ValueError("freq_mask_rate must be in [0, 1]")
+        if not 0.0 <= time_mask_rate <= 1.0:
+            raise ValueError("time_mask_rate must be in [0, 1]")
+        self.freq_mask_rate = freq_mask_rate
+        self.time_mask_rate = time_mask_rate
 
     def forward(self, spec: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
@@ -53,24 +51,20 @@ class SpecAugment(nn.Module):
         # 元のスペクトログラムをコピーして変更
         aug_spec = spec.clone()
 
-        for i in range(batch_size):
-            # 周波数マスキング
-            for _ in range(self.num_freq_masks):
-                f = random.randint(0, self.freq_mask_param)
-                if f == 0:
-                    continue
-                f0 = random.randint(0, num_mels - f)
-                aug_spec[i, :, f0 : f0 + f, :] = 0
-                freq_mask[i, f0 : f0 + f] = True
+        # rate 指定は連続区間ではなく、各軸要素を独立にランダムマスクする。
+        if self.freq_mask_rate > 0.0:
+            sampled_freq_mask = (
+                torch.rand(batch_size, num_mels, device=device) < self.freq_mask_rate
+            )
+            aug_spec = aug_spec.masked_fill(sampled_freq_mask[:, None, :, None], 0)
+            freq_mask |= sampled_freq_mask
 
-            # 時間マスキング
-            for _ in range(self.num_time_masks):
-                t = random.randint(0, self.time_mask_param)
-                if t == 0:
-                    continue
-                t0 = random.randint(0, num_frames - t)
-                aug_spec[i, :, :, t0 : t0 + t] = 0
-                time_mask[i, t0 : t0 + t] = True
+        if self.time_mask_rate > 0.0:
+            sampled_time_mask = (
+                torch.rand(batch_size, num_frames, device=device) < self.time_mask_rate
+            )
+            aug_spec = aug_spec.masked_fill(sampled_time_mask[:, None, None, :], 0)
+            time_mask |= sampled_time_mask
 
         return aug_spec, {"freq_mask": freq_mask, "time_mask": time_mask}
 

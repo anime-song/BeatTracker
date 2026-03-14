@@ -1,22 +1,28 @@
 # Experiment Summary
 
-Generated: 2026-03-13 15:28:04 UTC
+Generated: 2026-03-14 00:02:34 UTC
 
-Runs: 11
+Runs: 17
 
-| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | model | branch |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-classification |
-| exp_meter_classification_w0_0_5_beatpw10 | complete | 19 | 0.3599 | 30 | 0.3255 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/beat-pos-weight |
-| exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | L6/H64/O256 | exp/meter-classification |
-| exp_meter_classification_w0_0_5_beatpw7_5 | complete | 16 | 0.3493 | 30 | 0.3248 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/beat-pos-weight |
-| exp_meter_numerator_w0_05 | complete | 28 | 0.3398 | 30 | 0.3379 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-numerator-classification |
-| exp_meter_context_lowres_w0_05 | complete | 22 | 0.3382 | 30 | 0.3158 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-context-lowres |
-| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
-| exp_meter_classification_w0_3 | complete | 24 | 0.3249 | 30 | 0.3174 | 42 | 0.000300 | 8 | 0.300 | L6/H64/O256 | exp/meter-classification |
-| exp_meter_downbeat_conditioning_w0_05 | complete | 18 | 0.3248 | 30 | 0.3090 | 42 | 0.000300 | 8 | 0.050 | L6/H64/O256 | exp/meter-downbeat-conditioning |
-| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | L6/H64/O256 | - |
-| exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | L6/H64/O256 | exp/meter-classification |
+| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | specaug_f | specaug_t | model | branch |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 | complete | 23 | 0.3743 | 30 | 0.3569 | 42 | 0.000300 | 8 | 0.050 | 0.000 | 0.050 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_specaug_f0_02_t0_05 | complete | 23 | 0.3705 | 30 | 0.3581 | 42 | 0.000300 | 8 | 0.050 | 0.020 | 0.050 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_specaug_f0_05_t0_10 | complete | 25 | 0.3604 | 30 | 0.3439 | 42 | 0.000300 | 8 | 0.050 | 0.050 | 0.100 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_beatpw10 | complete | 19 | 0.3599 | 30 | 0.3255 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/beat-pos-weight |
+| exp_meter_classification_w0_0_5_specaug_f0_00_t0_10 | complete | 24 | 0.3581 | 30 | 0.3552 | 42 | 0.000300 | 8 | 0.050 | 0.000 | 0.100 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_classification_w0_0_5_specaug_f0_02_t0_00 | complete | 29 | 0.3504 | 30 | 0.3468 | 42 | 0.000300 | 8 | 0.050 | 0.020 | 0.000 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_beatpw7_5 | complete | 16 | 0.3493 | 30 | 0.3248 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/beat-pos-weight |
+| exp_meter_numerator_w0_05 | complete | 28 | 0.3398 | 30 | 0.3379 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/meter-numerator-classification |
+| exp_meter_context_lowres_w0_05 | complete | 22 | 0.3382 | 30 | 0.3158 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/meter-context-lowres |
+| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | - | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
+| exp_meter_classification_w0_3 | complete | 24 | 0.3249 | 30 | 0.3174 | 42 | 0.000300 | 8 | 0.300 | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_downbeat_conditioning_w0_05 | complete | 18 | 0.3248 | 30 | 0.3090 | 42 | 0.000300 | 8 | 0.050 | - | - | L6/H64/O256 | exp/meter-downbeat-conditioning |
+| exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | 0.050 | 0.000 | L6/H64/O256 | exp/spec-augment-mask-rate |
+| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | L6/H64/O256 | - |
+| exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | L6/H64/O256 | exp/meter-classification |
 
 ## exp_meter_classification_w0_0_5
 
@@ -37,6 +43,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -44,6 +52,96 @@ Runs: 11
 | resume | - |
 | git_branch | exp/meter-classification |
 | git_commit | 8af5e0224aad55ca3e419c04bc182d2e86acb6b0 |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_00_t0_05
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 |
+| status | complete |
+| best_epoch | 23 |
+| best_downbeat_f1 | 0.3743 |
+| best_beat_f1 | 0.5330 |
+| best_val_loss | 1.1145 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3569 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.000 |
+| spec_augment_time_mask_rate | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_02_t0_05
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_02_t0_05 |
+| status | complete |
+| best_epoch | 23 |
+| best_downbeat_f1 | 0.3705 |
+| best_beat_f1 | 0.5571 |
+| best_val_loss | 1.1243 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3581 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.020 |
+| spec_augment_time_mask_rate | 0.050 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_05_t0_10
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_05_t0_10 |
+| status | complete |
+| best_epoch | 25 |
+| best_downbeat_f1 | 0.3604 |
+| best_beat_f1 | 0.5355 |
+| best_val_loss | 1.2867 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3439 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.050 |
+| spec_augment_time_mask_rate | 0.100 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
 | git_dirty | true |
 
 ## exp_meter_classification_w0_0_5_beatpw10
@@ -65,6 +163,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -72,6 +172,36 @@ Runs: 11
 | resume | - |
 | git_branch | exp/beat-pos-weight |
 | git_commit | e545cd80edb38d95f645441fff508640064d0372 |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_00_t0_10
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_00_t0_10 |
+| status | complete |
+| best_epoch | 24 |
+| best_downbeat_f1 | 0.3581 |
+| best_beat_f1 | 0.5582 |
+| best_val_loss | 1.1460 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3552 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.000 |
+| spec_augment_time_mask_rate | 0.100 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
 | git_dirty | true |
 
 ## exp_meter_classification_w0_1
@@ -93,6 +223,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.100 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -100,6 +232,36 @@ Runs: 11
 | resume | - |
 | git_branch | exp/meter-classification |
 | git_commit | 07357ebe083aafc7234dad09257aa3b76e9e6ebe |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_02_t0_00
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_02_t0_00 |
+| status | complete |
+| best_epoch | 29 |
+| best_downbeat_f1 | 0.3504 |
+| best_beat_f1 | 0.5507 |
+| best_val_loss | 1.3130 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3468 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.020 |
+| spec_augment_time_mask_rate | 0.000 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
 | git_dirty | true |
 
 ## exp_meter_classification_w0_0_5_beatpw7_5
@@ -121,6 +283,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -149,6 +313,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -177,6 +343,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -205,6 +373,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -233,6 +403,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.300 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -261,6 +433,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -268,6 +442,36 @@ Runs: 11
 | resume | - |
 | git_branch | exp/meter-downbeat-conditioning |
 | git_commit | 8af5e0224aad55ca3e419c04bc182d2e86acb6b0 |
+| git_dirty | true |
+
+## exp_meter_classification_w0_0_5_specaug_f0_05_t0_00
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 |
+| status | complete |
+| best_epoch | 21 |
+| best_downbeat_f1 | 0.3146 |
+| best_beat_f1 | 0.4856 |
+| best_val_loss | 1.1120 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.2990 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| spec_augment_freq_mask_rate | 0.050 |
+| spec_augment_time_mask_rate | 0.000 |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/spec-augment-mask-rate |
+| git_commit | 1c6becc6e9ecd1f4043bc0dfb291c1ce1a861c55 |
 | git_dirty | true |
 
 ## beat_transcription
@@ -289,6 +493,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
@@ -317,6 +523,8 @@ Runs: 11
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
+| spec_augment_freq_mask_rate | - |
+| spec_augment_time_mask_rate | - |
 | audio_backend | packed |
 | scheduler | warmup_cosine |
 | ema_decay | 0.9990 |
