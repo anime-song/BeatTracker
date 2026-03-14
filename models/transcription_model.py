@@ -238,6 +238,7 @@ class BeatTranscriptionOutput:
     logits: torch.Tensor
     beat_logits: torch.Tensor
     downbeat_logits: torch.Tensor
+    meter_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -401,28 +402,39 @@ class Backbone(nn.Module):
 
 class BeatDownbeatHead(nn.Module):
     """
-    Backbone が出力したフレーム特徴から beat / downbeat のロジットを生成するヘッド。
+    Backbone が出力したフレーム特徴から beat / downbeat / meter のロジットを生成するヘッド。
     """
 
-    def __init__(self, input_dim: int, dropout: float = 0.0):
+    def __init__(
+        self,
+        input_dim: int,
+        num_meter_classes: int,
+        dropout: float = 0.0,
+    ):
         super().__init__()
         self.norm = RMSNorm(input_dim)
         self.dropout = nn.Dropout(dropout)
         self.beat_head = nn.Linear(input_dim, 1)
         self.downbeat_head = nn.Linear(input_dim, 1)
+        # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
+        self.meter_head = nn.Linear(input_dim, num_meter_classes)
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
         x = self.dropout(x)
 
+        # downbeat は beat の部分集合なので、この実験では beat 側へ直接加算する。
         beat_logits = self.beat_head(x).squeeze(-1)
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
+        beat_logits = beat_logits + downbeat_logits
+        meter_logits = self.meter_head(x)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
             logits=logits,
             beat_logits=beat_logits,
             downbeat_logits=downbeat_logits,
+            meter_logits=meter_logits,
         )
 
 
@@ -432,10 +444,19 @@ class BeatTranscriptionModel(nn.Module):
     Backbone は時系列特徴の抽出を担当し、このクラスで最終ロジットへ写像する。
     """
 
-    def __init__(self, backbone: Backbone, head_dropout: float = 0.0):
+    def __init__(
+        self,
+        backbone: Backbone,
+        num_meter_classes: int,
+        head_dropout: float = 0.0,
+    ):
         super().__init__()
         self.backbone = backbone
-        self.head = BeatDownbeatHead(backbone.output_dim, dropout=head_dropout)
+        self.head = BeatDownbeatHead(
+            backbone.output_dim,
+            num_meter_classes=num_meter_classes,
+            dropout=head_dropout,
+        )
 
     def forward(
         self,

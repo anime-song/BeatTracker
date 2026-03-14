@@ -32,7 +32,7 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
-from training.losses import ShiftTolerantBCELoss
+from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss
 
 
 class ValidationSegmentDataset(Dataset):
@@ -208,6 +208,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="checkpoint から optimizer / scheduler / EMA を含めて学習再開する。",
     )
+    parser.add_argument(
+        "--init-from",
+        type=Path,
+        default=None,
+        help="学習初期値として使う checkpoint。resume と違って optimizer は復元しない。",
+    )
+    parser.add_argument(
+        "--init-scope",
+        type=str,
+        choices=("backbone", "matching"),
+        default="backbone",
+        help="init-from でどの重みまで読むか。既定は backbone のみ。",
+    )
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--val-batch-size", type=int, default=8)
@@ -233,6 +246,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -293,6 +307,68 @@ def collect_git_metadata(project_root: Path) -> dict[str, object]:
     }
 
 
+def _extract_model_state_dict(
+    checkpoint: object,
+) -> tuple[dict[str, torch.Tensor], str]:
+    if not isinstance(checkpoint, dict):
+        raise ValueError("checkpoint does not contain a valid model state_dict")
+
+    # 学習時に EMA を持っている checkpoint は、初期値としてはこちらを優先する。
+    if "ema_state_dict" in checkpoint:
+        ema_state = checkpoint["ema_state_dict"]
+        if isinstance(ema_state, dict) and "model_state_dict" in ema_state:
+            state_dict = ema_state["model_state_dict"]
+        else:
+            state_dict = ema_state
+
+        if isinstance(state_dict, dict):
+            return state_dict, "ema_state_dict"
+
+    if "model_state_dict" in checkpoint and isinstance(
+        checkpoint["model_state_dict"], dict
+    ):
+        return checkpoint["model_state_dict"], "model_state_dict"
+
+    return checkpoint, "raw_checkpoint"
+
+
+def initialize_model_from_checkpoint(
+    model: BeatTranscriptionModel,
+    checkpoint_path: Path,
+    init_scope: str,
+) -> dict[str, object]:
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    source_state, state_source = _extract_model_state_dict(checkpoint)
+    target_state = model.state_dict()
+
+    filtered_state: dict[str, torch.Tensor] = {}
+    skipped_shape_keys: list[str] = []
+
+    for key, value in source_state.items():
+        if init_scope == "backbone" and not key.startswith("backbone."):
+            continue
+        if key not in target_state:
+            continue
+        if target_state[key].shape != value.shape:
+            skipped_shape_keys.append(key)
+            continue
+        filtered_state[key] = value
+
+    if not filtered_state:
+        raise ValueError(
+            f"No compatible parameters were found in {checkpoint_path} for init_scope={init_scope}"
+        )
+
+    load_result = model.load_state_dict(filtered_state, strict=False)
+    return {
+        "state_source": state_source,
+        "loaded_keys": len(filtered_state),
+        "missing_keys": list(load_result.missing_keys),
+        "unexpected_keys": list(load_result.unexpected_keys),
+        "skipped_shape_keys": skipped_shape_keys,
+    }
+
+
 def build_dataloaders(
     args: argparse.Namespace,
 ) -> tuple[BeatStemDataset, DataLoader, DataLoader]:
@@ -323,6 +399,7 @@ def build_dataloaders(
         random_pitch_shift=False,
         audio_backend=args.audio_backend,
         packed_audio_dir=args.packed_audio_dir,
+        meter_to_index=train_dataset.meter_to_index,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
     )
@@ -371,7 +448,11 @@ def build_model(
         dropout=args.dropout,
         use_gradient_checkpoint=True,
     )
-    return BeatTranscriptionModel(backbone=backbone, head_dropout=args.head_dropout)
+    return BeatTranscriptionModel(
+        backbone=backbone,
+        num_meter_classes=train_dataset.num_meter_classes,
+        head_dropout=args.head_dropout,
+    )
 
 
 def build_scheduler(
@@ -499,9 +580,7 @@ def load_resume_state(
     history_path: Path,
     steps_per_epoch: int,
 ) -> ResumeState:
-    checkpoint = torch.load(
-        checkpoint_path, map_location="cpu", weights_only=False
-    )
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     optimizer_state = checkpoint.get("optimizer_state_dict")
@@ -561,18 +640,45 @@ def compute_loss(
     batch: dict,
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
+    meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
 ) -> tuple[torch.Tensor, dict[str, float]]:
+    if output.meter_logits is None:
+        raise ValueError("Model output must include meter_logits")
+
+    # beat / downbeat は従来どおり BCE 系の loss を使う。
     beat_loss = beat_loss_fn(
         output.beat_logits, batch["beat_targets"], batch["valid_mask"]
     )
     downbeat_loss = downbeat_loss_fn(
         output.downbeat_logits, batch["downbeat_targets"], batch["valid_mask"]
     )
-    total_loss = beat_loss + downbeat_loss
+
+    # meter は小節全体のフレームへ貼った多クラス分類として扱う。
+    # 末尾の無効フレームは ignore_index にして loss から外す。
+    raw_meter_loss = meter_loss_fn(output.meter_logits, batch["meter_targets"])
+    meter_loss = raw_meter_loss * meter_loss_weight
+    valid_meter = batch["meter_targets"] != meter_loss_fn.ignore_index
+    if bool(valid_meter.any()):
+        meter_predictions = output.meter_logits.argmax(dim=-1)
+        meter_accuracy = float(
+            (meter_predictions[valid_meter] == batch["meter_targets"][valid_meter])
+            .float()
+            .mean()
+            .detach()
+        )
+    else:
+        meter_accuracy = 0.0
+
+    # 今回は重みづけを増やさず、3 タスクの和をそのまま最適化する。
+    total_loss = beat_loss + downbeat_loss + meter_loss
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
         "downbeat_loss": float(downbeat_loss.detach()),
+        "meter_loss": float(meter_loss.detach()),
+        "raw_meter_loss": float(raw_meter_loss.detach()),
+        "meter_accuracy": meter_accuracy,
     }
 
 
@@ -671,6 +777,8 @@ def train_one_epoch(
     scaler: torch.amp.GradScaler,
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
+    meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -699,7 +807,12 @@ def train_one_epoch(
         ):
             output = model(batch["waveform"])
             loss, loss_info = compute_loss(
-                output, batch, beat_loss_fn, downbeat_loss_fn
+                output,
+                batch,
+                beat_loss_fn,
+                downbeat_loss_fn,
+                meter_loss_fn,
+                meter_loss_weight,
             )
 
         if scaler.is_enabled():
@@ -736,6 +849,19 @@ def train_one_epoch(
                 "train_step/downbeat_loss", loss_info["downbeat_loss"], global_step
             )
             writer.add_scalar(
+                "train_step/meter_loss", loss_info["meter_loss"], global_step
+            )
+            writer.add_scalar(
+                "train_step/meter_accuracy",
+                loss_info["meter_accuracy"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_meter_loss",
+                loss_info["raw_meter_loss"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/lr", optimizer.param_groups[0]["lr"], global_step
             )
 
@@ -744,6 +870,7 @@ def train_one_epoch(
                 loss=f"{loss_info['loss']:.4f}",
                 beat=f"{loss_info['beat_loss']:.4f}",
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
+                meter=f"{loss_info['meter_loss']:.4f}",
             )
 
     return tracker.averages(), global_step
@@ -755,6 +882,8 @@ def validate(
     val_loader: DataLoader,
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
+    meter_loss_fn: BalancedSoftmaxLoss,
+    meter_loss_weight: float,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -791,7 +920,14 @@ def validate(
     for batch in progress:
         batch = move_batch_to_device(batch, device)
         output = model(batch["waveform"])
-        _, loss_info = compute_loss(output, batch, beat_loss_fn, downbeat_loss_fn)
+        _, loss_info = compute_loss(
+            output,
+            batch,
+            beat_loss_fn,
+            downbeat_loss_fn,
+            meter_loss_fn,
+            meter_loss_weight,
+        )
 
         tracker.update(loss_info)
         progress.set_postfix(loss=f"{loss_info['loss']:.4f}")
@@ -947,6 +1083,9 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "loss",
         "beat_loss",
         "downbeat_loss",
+        "meter_loss",
+        "raw_meter_loss",
+        "meter_accuracy",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -963,6 +1102,9 @@ def main() -> None:
     set_seed(args.seed)
     project_root = Path(__file__).resolve().parent.parent
 
+    if args.resume is not None and args.init_from is not None:
+        raise ValueError("--resume and --init-from cannot be used together")
+
     device = torch.device(
         args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     )
@@ -972,6 +1114,14 @@ def main() -> None:
 
     train_dataset, train_loader, val_loader = build_dataloaders(args)
     model = build_model(args, train_dataset).to(device)
+    init_info: Optional[dict[str, object]] = None
+    if args.init_from is not None:
+        # 和音採譜モデルなど別 task の checkpoint は、まず backbone だけ読むのが安全。
+        init_info = initialize_model_from_checkpoint(
+            model=model,
+            checkpoint_path=args.init_from,
+            init_scope=args.init_scope,
+        )
 
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
@@ -985,10 +1135,14 @@ def main() -> None:
     )
     beat_loss_fn = ShiftTolerantBCELoss(
         pos_weight=args.beat_pos_weight, tolerance=args.loss_tolerance
-    )
+    ).to(device)
     downbeat_loss_fn = ShiftTolerantBCELoss(
         pos_weight=args.downbeat_pos_weight, tolerance=args.loss_tolerance
-    )
+    ).to(device)
+    meter_loss_fn = BalancedSoftmaxLoss(
+        class_counts=train_dataset.meter_class_counts,
+        ignore_index=train_dataset.meter_ignore_index,
+    ).to(device)
 
     history_path = args.output_dir / "history.jsonl"
     best_downbeat_f1 = -1.0
@@ -1018,6 +1172,19 @@ def main() -> None:
     config_path = args.output_dir / "config.json"
     config_payload = dict(vars(args))
     config_payload.update(collect_git_metadata(project_root))
+    config_payload.update(
+        {
+            "meter_labels": list(train_dataset.meter_labels),
+            "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "init_state_source": None
+            if init_info is None
+            else init_info["state_source"],
+            "init_loaded_keys": None if init_info is None else init_info["loaded_keys"],
+            "init_skipped_shape_keys": []
+            if init_info is None
+            else init_info["skipped_shape_keys"],
+        }
+    )
     config_text = json.dumps(config_payload, indent=2, default=str)
     config_path.write_text(config_text, encoding="utf-8")
     writer = SummaryWriter(log_dir=str(tensorboard_dir))
@@ -1026,10 +1193,24 @@ def main() -> None:
     print(f"device={device}")
     print(f"train_songs={len(train_dataset.songs)}, train_batches={len(train_loader)}")
     print(f"val_segments={len(val_loader.dataset)}, val_batches={len(val_loader)}")
+    print(
+        "meter="
+        f"classes={train_dataset.num_meter_classes}, "
+        f"labels={list(train_dataset.meter_labels)}"
+    )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
+    print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
+    if args.init_from is not None:
+        print(
+            "init="
+            f"path={args.init_from}, scope={args.init_scope}, "
+            f"source={init_info['state_source'] if init_info is not None else '-'}, "
+            f"loaded_keys={init_info['loaded_keys'] if init_info is not None else 0}, "
+            f"skipped_shape_keys={len(init_info['skipped_shape_keys']) if init_info is not None else 0}"
+        )
     if args.resume is not None:
         print(
             "resume="
@@ -1061,6 +1242,8 @@ def main() -> None:
                 scaler=scaler,
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
+                meter_loss_fn=meter_loss_fn,
+                meter_loss_weight=args.meter_loss_weight,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
@@ -1075,6 +1258,8 @@ def main() -> None:
                 val_loader=val_loader,
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
+                meter_loss_fn=meter_loss_fn,
+                meter_loss_weight=args.meter_loss_weight,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,
