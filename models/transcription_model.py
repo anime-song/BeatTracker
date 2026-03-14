@@ -239,6 +239,8 @@ class BeatTranscriptionOutput:
     beat_logits: torch.Tensor
     downbeat_logits: torch.Tensor
     meter_logits: Optional[torch.Tensor] = None
+    broadband_flux_logits: Optional[torch.Tensor] = None
+    onset_env_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -399,6 +401,21 @@ class Backbone(nn.Module):
 
         return x
 
+class DrumAuxHead(nn.Module):
+    """
+    drums stem 由来の補助系列を回帰する小さな head。
+    """
+
+    def __init__(self, input_dim: int):
+        super().__init__()
+        self.broadband_flux = nn.Linear(input_dim, 1)
+        self.onset_env = nn.Linear(input_dim, 1)
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        broadband_flux_logits = self.broadband_flux(x).squeeze(-1)
+        onset_env_logits = self.onset_env(x).squeeze(-1)
+        return broadband_flux_logits, onset_env_logits
+
 
 class BeatDownbeatHead(nn.Module):
     """
@@ -409,6 +426,7 @@ class BeatDownbeatHead(nn.Module):
         self,
         input_dim: int,
         num_meter_classes: int,
+        use_drum_aux_head: bool = False,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -418,6 +436,7 @@ class BeatDownbeatHead(nn.Module):
         self.downbeat_head = nn.Linear(input_dim, 1)
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
+        self.drum_aux_head = DrumAuxHead(input_dim) if use_drum_aux_head else None
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
@@ -428,6 +447,11 @@ class BeatDownbeatHead(nn.Module):
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
         beat_logits = beat_logits + downbeat_logits
         meter_logits = self.meter_head(x)
+        if self.drum_aux_head is None:
+            broadband_flux_logits = None
+            onset_env_logits = None
+        else:
+            broadband_flux_logits, onset_env_logits = self.drum_aux_head(x)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -435,6 +459,8 @@ class BeatDownbeatHead(nn.Module):
             beat_logits=beat_logits,
             downbeat_logits=downbeat_logits,
             meter_logits=meter_logits,
+            broadband_flux_logits=broadband_flux_logits,
+            onset_env_logits=onset_env_logits,
         )
 
 
@@ -448,6 +474,7 @@ class BeatTranscriptionModel(nn.Module):
         self,
         backbone: Backbone,
         num_meter_classes: int,
+        use_drum_aux_head: bool = False,
         head_dropout: float = 0.0,
     ):
         super().__init__()
@@ -455,6 +482,7 @@ class BeatTranscriptionModel(nn.Module):
         self.head = BeatDownbeatHead(
             backbone.output_dim,
             num_meter_classes=num_meter_classes,
+            use_drum_aux_head=use_drum_aux_head,
             dropout=head_dropout,
         )
 

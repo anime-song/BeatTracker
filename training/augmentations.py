@@ -1,8 +1,62 @@
 import torch
 import torch.nn.functional as F
 import torchaudio.functional as AF
-import random
 import math
+
+
+@torch.no_grad()
+def apply_ranked_stem_dropout(
+    waveform: torch.Tensor,
+    num_stems: int,
+    max_dropout_stems: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    stem ごとのエネルギーを見て、弱い stem から順にランダム本数だけ落とす。
+    最低 1 stem は残し、学習時の頑健性を上げるために使う。
+    """
+    if waveform.dim() != 3:
+        raise ValueError("waveform must have shape (B, C, T)")
+    if num_stems <= 0:
+        raise ValueError("num_stems must be positive")
+    if waveform.shape[1] % num_stems != 0:
+        raise ValueError("audio channels must be divisible by num_stems")
+
+    batch_size, num_channels, num_samples = waveform.shape
+    channels_per_stem = num_channels // num_stems
+    effective_max_dropout = min(int(max_dropout_stems), num_stems - 1)
+    if effective_max_dropout <= 0:
+        dropped_counts = torch.zeros(
+            batch_size, dtype=torch.long, device=waveform.device
+        )
+        return waveform, dropped_counts
+
+    stem_waveform = waveform.view(batch_size, num_stems, channels_per_stem, num_samples)
+
+    # stereo をまとめた平均二乗エネルギーで stem を並べる。
+    stem_energy = stem_waveform.square().mean(dim=(2, 3))
+    energy_rank = torch.argsort(stem_energy, dim=1, descending=False)
+
+    dropped_counts = torch.randint(
+        low=1,
+        high=effective_max_dropout + 1,
+        size=(batch_size,),
+        device=waveform.device,
+    )
+    drop_mask = torch.zeros(
+        (batch_size, num_stems),
+        dtype=torch.bool,
+        device=waveform.device,
+    )
+
+    rank_index = torch.arange(num_stems, device=waveform.device).unsqueeze(0)
+    should_drop_by_rank = rank_index < dropped_counts.unsqueeze(1)
+    drop_mask.scatter_(dim=1, index=energy_rank, src=should_drop_by_rank)
+
+    augmented = stem_waveform.masked_fill(
+        drop_mask.unsqueeze(-1).unsqueeze(-1),
+        0.0,
+    )
+    return augmented.view_as(waveform), dropped_counts
 
 
 @torch.no_grad()

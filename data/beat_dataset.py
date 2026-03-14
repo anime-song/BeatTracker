@@ -105,6 +105,14 @@ def _meter_label_sort_key(meter_label: str) -> tuple[int, int]:
     return int(numerator), int(denominator)
 
 
+def _minmax_normalize_1d(x: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    if x.numel() == 0:
+        return x
+    x_min = x.min()
+    x_max = x.max()
+    return (x - x_min) / (x_max - x_min + eps)
+
+
 def derive_beat_downbeat_and_meter_annotations(
     annotation_path: Path,
 ) -> tuple[torch.Tensor, torch.Tensor, float, tuple[MeterAnnotation, ...]]:
@@ -309,6 +317,9 @@ class BeatStemDataset(Dataset):
         self.max_open_files = int(max_open_files)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
         self._packed_array_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        if "drums" not in self.stem_names:
+            raise ValueError("drum auxiliary targets require a 'drums' stem")
+        self.drums_stem_index = self.stem_names.index("drums")
 
         if self.segment_seconds <= 0:
             raise ValueError("segment_seconds must be positive")
@@ -763,6 +774,62 @@ class BeatStemDataset(Dataset):
             )
         return class_counts
 
+    def _compute_drum_aux_targets(
+        self,
+        waveform: torch.Tensor,
+        valid_frames: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        drums stem から broadband spectral flux と onset envelope を作る。
+        どちらも 0-1 の 1 次元系列にして、valid 範囲外は 0 にする。
+        """
+        flux_targets = torch.zeros(self.target_num_frames, dtype=torch.float32)
+        onset_targets = torch.zeros(self.target_num_frames, dtype=torch.float32)
+        if valid_frames <= 0:
+            return flux_targets, onset_targets
+
+        start_channel = self.drums_stem_index * self.channels_per_stem
+        end_channel = start_channel + self.channels_per_stem
+        drums_waveform = waveform[start_channel:end_channel].mean(dim=0, keepdim=True)
+
+        window = torch.hann_window(self.n_fft, dtype=drums_waveform.dtype)
+        drum_spec = torch.stft(
+            drums_waveform,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.n_fft,
+            window=window,
+            return_complex=True,
+        )
+        drum_mag = torch.log1p(drum_spec.abs())
+
+        diff = F.relu(drum_mag[:, :, 1:] - drum_mag[:, :, :-1])
+        broadband_flux = F.pad(diff.sum(dim=1), (1, 0)).squeeze(0)
+
+        # onset envelope は flux を少し平滑化したものにする。
+        smooth_kernel = 5
+        smooth_weight = torch.full(
+            (1, 1, smooth_kernel),
+            fill_value=1.0 / smooth_kernel,
+            dtype=broadband_flux.dtype,
+        )
+        onset_envelope = F.conv1d(
+            broadband_flux.view(1, 1, -1),
+            smooth_weight,
+            padding=smooth_kernel // 2,
+        ).view(-1)
+
+        broadband_flux = _minmax_normalize_1d(broadband_flux)
+        onset_envelope = _minmax_normalize_1d(onset_envelope)
+
+        target_length = min(self.target_num_frames, broadband_flux.numel())
+        flux_targets[:target_length] = broadband_flux[:target_length]
+        onset_targets[:target_length] = onset_envelope[:target_length]
+        if valid_frames < self.target_num_frames:
+            flux_targets[valid_frames:] = 0.0
+            onset_targets[valid_frames:] = 0.0
+        return flux_targets, onset_targets
+
     def make_sample(
         self,
         song: SongEntry,
@@ -806,12 +873,18 @@ class BeatStemDataset(Dataset):
             target_num_frames=self.target_num_frames,
             valid_frames=valid_frames,
         )
+        broadband_flux_targets, onset_env_targets = self._compute_drum_aux_targets(
+            waveform=waveform,
+            valid_frames=valid_frames,
+        )
 
         return {
             "waveform": waveform,
             "beat_targets": beat_targets,
             "downbeat_targets": downbeat_targets,
             "meter_targets": meter_targets,
+            "broadband_flux_targets": broadband_flux_targets,
+            "onset_env_targets": onset_env_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,
