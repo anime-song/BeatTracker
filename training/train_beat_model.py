@@ -255,6 +255,12 @@ def parse_args() -> argparse.Namespace:
         help="drums stem から作った flux / onset 補助回帰 loss の重み。",
     )
     parser.add_argument(
+        "--piano-aux-loss-weight",
+        type=float,
+        default=0.1,
+        help="piano stem から作った broadband flux 補助回帰 loss の重み。",
+    )
+    parser.add_argument(
         "--stem-dropout-max-count",
         type=int,
         default=4,
@@ -465,6 +471,7 @@ def build_model(
         backbone=backbone,
         num_meter_classes=train_dataset.num_meter_classes,
         use_drum_aux_head=args.drum_aux_loss_weight > 0.0,
+        use_piano_aux_head=args.piano_aux_loss_weight > 0.0,
         head_dropout=args.head_dropout,
     )
 
@@ -657,6 +664,7 @@ def compute_loss(
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
+    piano_aux_loss_weight: float,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if output.meter_logits is None:
         raise ValueError("Model output must include meter_logits")
@@ -709,8 +717,33 @@ def compute_loss(
 
     drum_aux_loss = raw_drum_aux_loss * drum_aux_loss_weight
 
-    # 補助タスクは meter と drum aux の 2 本を足す。
-    total_loss = beat_loss + downbeat_loss + meter_loss + drum_aux_loss
+    raw_piano_aux_loss = beat_loss.new_tensor(0.0)
+    piano_broadband_flux_loss = beat_loss.new_tensor(0.0)
+    if piano_aux_loss_weight > 0.0:
+        if output.piano_broadband_flux_logits is None:
+            raise ValueError("Model output must include piano auxiliary logits")
+
+        valid_mask = batch["valid_mask"]
+        piano_broadband_flux_predictions = torch.sigmoid(
+            output.piano_broadband_flux_logits
+        )
+        piano_broadband_flux_loss = masked_l1_loss(
+            piano_broadband_flux_predictions,
+            batch["piano_broadband_flux_targets"],
+            valid_mask,
+        )
+        raw_piano_aux_loss = piano_broadband_flux_loss
+
+    piano_aux_loss = raw_piano_aux_loss * piano_aux_loss_weight
+
+    # 補助タスクは meter / drum aux / piano aux を足す。
+    total_loss = (
+        beat_loss
+        + downbeat_loss
+        + meter_loss
+        + drum_aux_loss
+        + piano_aux_loss
+    )
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
@@ -722,6 +755,9 @@ def compute_loss(
         "raw_drum_aux_loss": float(raw_drum_aux_loss.detach()),
         "broadband_flux_loss": float(broadband_flux_loss.detach()),
         "onset_env_loss": float(onset_env_loss.detach()),
+        "piano_aux_loss": float(piano_aux_loss.detach()),
+        "raw_piano_aux_loss": float(raw_piano_aux_loss.detach()),
+        "piano_broadband_flux_loss": float(piano_broadband_flux_loss.detach()),
     }
 
 
@@ -823,6 +859,7 @@ def train_one_epoch(
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
+    piano_aux_loss_weight: float,
     num_stems: int,
     stem_dropout_max_count: int,
     device: torch.device,
@@ -869,6 +906,7 @@ def train_one_epoch(
                 meter_loss_fn,
                 meter_loss_weight,
                 drum_aux_loss_weight,
+                piano_aux_loss_weight,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
 
@@ -939,6 +977,21 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/piano_aux_loss",
+                loss_info["piano_aux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_piano_aux_loss",
+                loss_info["raw_piano_aux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/piano_broadband_flux_loss",
+                loss_info["piano_broadband_flux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/stem_dropout_count",
                 loss_info["stem_dropout_count"],
                 global_step,
@@ -954,6 +1007,7 @@ def train_one_epoch(
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
+                piano=f"{loss_info['piano_aux_loss']:.4f}",
             )
 
     return tracker.averages(), global_step
@@ -968,6 +1022,7 @@ def validate(
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
+    piano_aux_loss_weight: float,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -1012,6 +1067,7 @@ def validate(
             meter_loss_fn,
             meter_loss_weight,
             drum_aux_loss_weight,
+            piano_aux_loss_weight,
         )
 
         tracker.update(loss_info)
@@ -1175,6 +1231,9 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "raw_drum_aux_loss",
         "broadband_flux_loss",
         "onset_env_loss",
+        "piano_aux_loss",
+        "raw_piano_aux_loss",
+        "piano_broadband_flux_loss",
         "stem_dropout_count",
         "beat_precision",
         "beat_recall",
@@ -1267,6 +1326,7 @@ def main() -> None:
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
+            "use_piano_aux_head": args.piano_aux_loss_weight > 0.0,
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1292,6 +1352,7 @@ def main() -> None:
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
+    print(f"piano_aux_loss_weight={args.piano_aux_loss_weight}")
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
@@ -1338,6 +1399,7 @@ def main() -> None:
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
+                piano_aux_loss_weight=args.piano_aux_loss_weight,
                 num_stems=len(train_dataset.stem_names),
                 stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
@@ -1357,6 +1419,7 @@ def main() -> None:
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
+                piano_aux_loss_weight=args.piano_aux_loss_weight,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,
