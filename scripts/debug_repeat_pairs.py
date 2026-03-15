@@ -44,15 +44,43 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         default=list(DEFAULT_STEM_NAMES),
     )
-    parser.add_argument("--repeat-ssm-threshold", type=float, default=0.85)
-    parser.add_argument("--repeat-ssm-min-length-beats", type=int, default=8)
+    parser.add_argument(
+        "--repeat-ssm-threshold",
+        type=float,
+        default=0.85,
+        help="SSM 上で『似ている』とみなす最小類似度。上げるほど候補は減り、厳しくなる。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-sync-unit",
+        type=str,
+        choices=("beat", "bar"),
+        default="beat",
+        help="SSM を beat 単位で作るか、bar 単位で作るか。bar の方が構造反復寄りになりやすい。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-min-length-beats",
+        type=int,
+        default=8,
+        help="採用する対角線 run の最小長。sync_unit=beat なら beat 数、bar なら bar 数として解釈する。",
+    )
     parser.add_argument(
         "--repeat-ssm-near-diagonal-margin-beats",
         type=int,
         default=16,
+        help="主対角線の近くを捨てるための最小オフセット。sync_unit=beat なら beat 数、bar なら bar 数。",
     )
-    parser.add_argument("--repeat-ssm-max-length-beats", type=int, default=16)
-    parser.add_argument("--repeat-ssm-max-pairs", type=int, default=128)
+    parser.add_argument(
+        "--repeat-ssm-max-length-beats",
+        type=int,
+        default=16,
+        help="1 本の対角線 run から使う最大長。長すぎる run を切って局所反復の暴走を抑える。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-max-pairs",
+        type=int,
+        default=128,
+        help="最終的に保持する frame ペア数の上限。大きいほど loss には多く入るが、ノイズも増えやすい。",
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -74,6 +102,7 @@ def build_dataset(args: argparse.Namespace) -> BeatStemDataset:
         audio_backend=args.audio_backend,
         packed_audio_dir=args.packed_audio_dir,
         enable_repeat_pair_targets=True,
+        repeat_ssm_sync_unit=args.repeat_ssm_sync_unit,
         repeat_ssm_threshold=args.repeat_ssm_threshold,
         repeat_ssm_min_length_beats=args.repeat_ssm_min_length_beats,
         repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
@@ -118,18 +147,21 @@ def write_summary_json(
         "start_sec": args.start_sec,
         "segment_seconds": args.segment_seconds,
         "valid_frames": valid_frames,
-        "beat_count_in_window": int(debug_info.beat_frame_indices.numel()),
-        "beat_sync_count": int(debug_info.beat_start_frames.numel()),
+        "sync_unit": debug_info.sync_unit,
+        "event_count_in_window": int(debug_info.sync_frame_indices.numel()),
+        "sync_count": int(debug_info.sync_start_frames.numel()),
+        "sync_labels": list(debug_info.sync_labels),
         "repeat_pair_count": int(debug_info.targets.pair_mask.sum().item()),
+        "repeat_ssm_sync_unit": args.repeat_ssm_sync_unit,
         "repeat_ssm_threshold": args.repeat_ssm_threshold,
         "repeat_ssm_min_length_beats": args.repeat_ssm_min_length_beats,
         "repeat_ssm_near_diagonal_margin_beats": args.repeat_ssm_near_diagonal_margin_beats,
         "repeat_ssm_max_length_beats": args.repeat_ssm_max_length_beats,
         "runs": [
             {
-                "start_beat_a": run.start_beat_a,
-                "start_beat_b": run.start_beat_b,
-                "length_beats": run.length_beats,
+                "start_index_a": run.start_index_a,
+                "start_index_b": run.start_index_b,
+                "length_units": run.length_units,
                 "mean_similarity": run.mean_similarity,
             }
             for run in debug_info.runs
@@ -181,10 +213,10 @@ def _svg_run_lines(
         return lines
     cell_size = size / beat_count
     for run in runs:
-        x1 = left + (run.start_beat_b + 0.5) * cell_size
-        y1 = top + (run.start_beat_a + 0.5) * cell_size
-        x2 = left + (run.start_beat_b + run.length_beats - 0.5) * cell_size
-        y2 = top + (run.start_beat_a + run.length_beats - 0.5) * cell_size
+        x1 = left + (run.start_index_b + 0.5) * cell_size
+        y1 = top + (run.start_index_a + 0.5) * cell_size
+        x2 = left + (run.start_index_b + run.length_units - 0.5) * cell_size
+        y2 = top + (run.start_index_a + run.length_units - 0.5) * cell_size
         lines.append(
             f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" '
             'stroke="#d94841" stroke-width="2.0" stroke-linecap="round"/>'
@@ -207,7 +239,8 @@ def write_ssm_svg(path: Path, song_id: str, start_sec: float, debug_info) -> Non
         '<rect width="100%" height="100%" fill="#f7f9fc"/>',
         f'<text x="24" y="30" font-size="22" font-weight="700" fill="#15212b">Repeat Pair Debug</text>',
         f'<text x="24" y="55" font-size="13" fill="#425466">song={html.escape(song_id)} start_sec={start_sec:.2f} '
-        f'beat_sync={int(debug_info.beat_start_frames.numel())} selected_pairs={int(debug_info.targets.pair_mask.sum().item())}</text>',
+        f'{html.escape(debug_info.sync_unit)}_sync={int(debug_info.sync_start_frames.numel())} '
+        f'selected_pairs={int(debug_info.targets.pair_mask.sum().item())}</text>',
         f'<rect x="{left}" y="{top}" width="{matrix_size}" height="{matrix_size}" fill="#ffffff" stroke="#425466" stroke-width="1.2"/>',
         *_svg_heatmap_cells(similarity, left, top, matrix_size),
         *_svg_run_lines(debug_info.runs, beat_count, left, top, matrix_size),
@@ -244,7 +277,7 @@ def write_ssm_svg(path: Path, song_id: str, start_sec: float, debug_info) -> Non
         for index, run in enumerate(debug_info.runs[:8], start=1):
             lines.append(
                 f'<text x="{left}" y="{run_text_y + index * 18}" font-size="12" fill="#425466">'
-                f'{index}. ({run.start_beat_a}, {run.start_beat_b}) len={run.length_beats} sim={run.mean_similarity:.3f}</text>'
+                f'{index}. ({run.start_index_a}, {run.start_index_b}) len={run.length_units} sim={run.mean_similarity:.3f}</text>'
             )
 
     lines.append("</svg>")
@@ -263,11 +296,25 @@ def main() -> None:
     _, debug_info = dataset.repeat_pair_builder.analyze(
         waveform=sample["waveform"],
         beat_times=song.beat_times,
+        downbeat_times=song.downbeat_times,
+        meter_segments=tuple(
+            (
+                meter_annotation.start_sec,
+                meter_annotation.end_sec,
+                meter_annotation.meter_label,
+            )
+            for meter_annotation in song.meter_annotations
+        ),
         start_sec=args.start_sec,
         valid_frames=valid_frames,
     )
 
-    output_dir = args.output_dir / song.song_id / f"start_{args.start_sec:.2f}"
+    output_dir = (
+        args.output_dir
+        / args.repeat_ssm_sync_unit
+        / song.song_id
+        / f"start_{args.start_sec:.2f}"
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     write_summary_json(output_dir / "repeat_debug.json", args, song, valid_frames, debug_info)
     write_pairs_csv(
@@ -278,8 +325,9 @@ def main() -> None:
     write_ssm_svg(output_dir / "repeat_ssm.svg", song.song_id, args.start_sec, debug_info)
 
     print(f"song_id={song.song_id}")
+    print(f"sync_unit={debug_info.sync_unit}")
     print(f"valid_frames={valid_frames}")
-    print(f"beat_sync_count={int(debug_info.beat_start_frames.numel())}")
+    print(f"sync_count={int(debug_info.sync_start_frames.numel())}")
     print(f"repeat_pair_count={int(debug_info.targets.pair_mask.sum().item())}")
     print(f"json={output_dir / 'repeat_debug.json'}")
     print(f"csv={output_dir / 'repeat_pairs.csv'}")

@@ -286,6 +286,7 @@ class BeatStemDataset(Dataset):
         packed_audio_dir: Optional[str | Path] = None,
         meter_to_index: Optional[Dict[str, int]] = None,
         enable_repeat_pair_targets: bool = False,
+        repeat_ssm_sync_unit: str = "beat",
         repeat_ssm_threshold: float = 0.85,
         repeat_ssm_min_length_beats: int = 8,
         repeat_ssm_near_diagonal_margin_beats: int = 16,
@@ -494,6 +495,7 @@ class BeatStemDataset(Dataset):
                 hop_length=self.hop_length,
                 target_num_frames=self.target_num_frames,
                 n_fft=self.n_fft,
+                sync_unit=repeat_ssm_sync_unit,
                 similarity_threshold=repeat_ssm_threshold,
                 min_diagonal_length_beats=repeat_ssm_min_length_beats,
                 near_diagonal_margin_beats=repeat_ssm_near_diagonal_margin_beats,
@@ -864,6 +866,15 @@ class BeatStemDataset(Dataset):
             built_repeat_pair_targets = self.repeat_pair_builder.build(
                 waveform=waveform,
                 beat_times=song.beat_times,
+                downbeat_times=song.downbeat_times,
+                meter_segments=tuple(
+                    (
+                        meter_annotation.start_sec,
+                        meter_annotation.end_sec,
+                        meter_annotation.meter_label,
+                    )
+                    for meter_annotation in song.meter_annotations
+                ),
                 start_sec=start_sec,
                 valid_frames=valid_frames,
             )

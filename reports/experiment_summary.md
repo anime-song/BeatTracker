@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-15 05:39:08 UTC
+Generated: 2026-03-15 07:43:10 UTC
 
-Runs: 29
+Runs: 30
 
 ## Progress
 
@@ -15,6 +15,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm | complete | 23 | 0.4705 | 30 | 0.4444 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
 | exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar | complete | 21 | 0.4594 | 30 | 0.4370 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
 | exp_chord_preinit_stemdrop2_drumaux_basslowflux | complete | 17 | 0.4536 | 30 | 0.4387 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
 | exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | - | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
 | exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
@@ -64,6 +65,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
 | repeat_consistency_loss_weight | 0.100 |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | 0.850 |
 | repeat_ssm_min_length_beats | 8 |
 | repeat_ssm_near_diagonal_margin_beats | 16 |
@@ -103,6 +105,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -142,6 +145,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -157,6 +161,46 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | resume | - |
 | git_branch | exp/drum-aux-flux-onset |
 | git_commit | f9c10e4c96d429b7ff085d05e21029188377c398 |
+| git_dirty | true |
+
+## exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar |
+| status | complete |
+| best_epoch | 21 |
+| best_downbeat_f1 | 0.4594 |
+| best_beat_f1 | 0.6514 |
+| best_val_loss | 1.2455 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4370 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| repeat_consistency_loss_weight | 0.100 |
+| repeat_ssm_sync_unit | bar |
+| repeat_ssm_threshold | 0.850 |
+| repeat_ssm_min_length_beats | 2 |
+| repeat_ssm_near_diagonal_margin_beats | 2 |
+| repeat_ssm_max_length_beats | 4 |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/repeat-ssm-downbeat-consistency |
+| git_commit | 43c5ebc0956f6303f2f07fab809fdc97af1efa14 |
 | git_dirty | true |
 
 ## exp_chord_preinit_stemdrop2_drumaux_basslowflux
@@ -181,6 +225,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -220,6 +265,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -259,6 +305,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -298,6 +345,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -337,6 +385,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -376,6 +425,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -415,6 +465,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -454,6 +505,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -493,6 +545,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -532,6 +585,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -571,6 +625,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -610,6 +665,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -649,6 +705,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -688,6 +745,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -727,6 +785,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -766,6 +825,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -805,6 +865,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -844,6 +905,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -883,6 +945,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -922,6 +985,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -961,6 +1025,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -1000,6 +1065,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -1039,6 +1105,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -1078,6 +1145,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -1117,6 +1185,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |
@@ -1156,6 +1225,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
 | repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
 | repeat_ssm_threshold | - |
 | repeat_ssm_min_length_beats | - |
 | repeat_ssm_near_diagonal_margin_beats | - |

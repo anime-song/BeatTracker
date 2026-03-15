@@ -32,6 +32,7 @@ class ExperimentSummary:
     drum_aux_loss_weight: Optional[float]
     drum_aux_use_high_frequency_flux: Optional[bool]
     repeat_consistency_loss_weight: Optional[float]
+    repeat_ssm_sync_unit: Optional[str]
     repeat_ssm_threshold: Optional[float]
     repeat_ssm_min_length_beats: Optional[int]
     repeat_ssm_near_diagonal_margin_beats: Optional[int]
@@ -89,6 +90,7 @@ class ExperimentSummary:
             "repeat_consistency_loss_weight": _format_float(
                 self.repeat_consistency_loss_weight, digits=3
             ),
+            "repeat_ssm_sync_unit": self.repeat_ssm_sync_unit or "",
             "repeat_ssm_threshold": _format_float(
                 self.repeat_ssm_threshold, digits=3
             ),
@@ -188,6 +190,13 @@ def _as_bool(value: Any) -> Optional[bool]:
     return bool(value)
 
 
+def _as_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None
+
+
 def _format_int(value: Optional[int]) -> str:
     return "" if value is None else str(value)
 
@@ -281,6 +290,7 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         repeat_consistency_loss_weight=_as_float(
             config.get("repeat_consistency_loss_weight")
         ),
+        repeat_ssm_sync_unit=_as_str(config.get("repeat_ssm_sync_unit")),
         repeat_ssm_threshold=_as_float(config.get("repeat_ssm_threshold")),
         repeat_ssm_min_length_beats=_as_int(
             config.get("repeat_ssm_min_length_beats")
@@ -356,6 +366,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "drum_aux_loss_weight",
         "drum_aux_use_high_frequency_flux",
         "repeat_consistency_loss_weight",
+        "repeat_ssm_sync_unit",
         "repeat_ssm_threshold",
         "repeat_ssm_min_length_beats",
         "repeat_ssm_near_diagonal_margin_beats",
@@ -674,6 +685,10 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                                 summary.repeat_consistency_loss_weight, digits=3
                             )
                             or "-",
+                        ],
+                        [
+                            "repeat_ssm_sync_unit",
+                            summary.repeat_ssm_sync_unit or "-",
                         ],
                         [
                             "repeat_ssm_threshold",

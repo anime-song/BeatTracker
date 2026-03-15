@@ -277,37 +277,44 @@ def parse_args() -> argparse.Namespace:
         "--repeat-consistency-loss-weight",
         type=float,
         default=0.0,
-        help="繰り返し区間ペア上で downbeat 出力を似せる補助 loss の重み。",
+        help="繰り返し区間ペア上で downbeat 出力を似せる補助 loss の重み。0 で無効。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-sync-unit",
+        type=str,
+        choices=("beat", "bar"),
+        default="beat",
+        help="SSM を beat 単位で作るか、bar 単位で作るか。bar の方が構造反復寄りになりやすい。",
     )
     parser.add_argument(
         "--repeat-ssm-threshold",
         type=float,
         default=0.85,
-        help="beat 同期 SSM を 2 値化するしきい値。",
+        help="SSM 上で『似ている』とみなす最小類似度。上げるほど候補は減り、厳しくなる。",
     )
     parser.add_argument(
         "--repeat-ssm-min-length-beats",
         type=int,
         default=8,
-        help="繰り返しとして採用する最小の対角線長 (beats)。",
+        help="採用する対角線 run の最小長。sync_unit=beat なら beat 数、bar なら bar 数として解釈する。",
     )
     parser.add_argument(
         "--repeat-ssm-near-diagonal-margin-beats",
         type=int,
         default=16,
-        help="主対角線に近すぎる候補を捨てるための最小オフセット (beats)。",
+        help="主対角線に近すぎる候補を捨てるための最小オフセット。sync_unit=beat なら beat 数、bar なら bar 数。",
     )
     parser.add_argument(
         "--repeat-ssm-max-length-beats",
         type=int,
         default=16,
-        help="1 本の対角線 run から使う最大長 (beats)。",
+        help="1 本の対角線 run から使う最大長。長すぎる run を切って局所反復の暴走を抑える。",
     )
     parser.add_argument(
         "--repeat-ssm-max-pairs",
         type=int,
         default=128,
-        help="1 サンプルあたりに保持する繰り返し beat ペア数の上限。",
+        help="1 サンプルあたりに保持する frame ペア数の上限。大きいほど loss には多く入るが、ノイズも増えやすい。",
     )
     parser.add_argument(
         "--stem-dropout-max-count",
@@ -458,6 +465,7 @@ def build_dataloaders(
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
         enable_repeat_pair_targets=args.repeat_consistency_loss_weight > 0.0,
+        repeat_ssm_sync_unit=args.repeat_ssm_sync_unit,
         repeat_ssm_threshold=args.repeat_ssm_threshold,
         repeat_ssm_min_length_beats=args.repeat_ssm_min_length_beats,
         repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
@@ -478,6 +486,7 @@ def build_dataloaders(
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
         enable_repeat_pair_targets=args.repeat_consistency_loss_weight > 0.0,
+        repeat_ssm_sync_unit=args.repeat_ssm_sync_unit,
         repeat_ssm_threshold=args.repeat_ssm_threshold,
         repeat_ssm_min_length_beats=args.repeat_ssm_min_length_beats,
         repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,

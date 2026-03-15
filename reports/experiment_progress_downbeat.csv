@@ -28,3 +28,4 @@ completion_order,run_name,completed_at_estimated,best_downbeat_f1,running_best_d
 27,exp_chord_preinit_stemdrop2_drumaux_pianoaux,2026-03-14 16:06:07 UTC,0.4440,0.4598
 28,exp_chord_preinit_stemdrop2_drumaux_highfreq,2026-03-15 03:28:47 UTC,0.4642,0.4642
 29,exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm,2026-03-15 05:34:47 UTC,0.4705,0.4705
+30,exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar,2026-03-15 07:42:39 UTC,0.4594,0.4705
