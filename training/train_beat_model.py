@@ -276,7 +276,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--repeat-consistency-loss-weight",
         type=float,
-        default=0.0,
+        default=0.1,
         help="繰り返し区間ペア上で downbeat 出力を似せる補助 loss の重み。0 で無効。",
     )
     parser.add_argument(
@@ -822,11 +822,7 @@ def compute_loss(
 
     # 補助タスクは meter / drum aux / repeat consistency を足す。
     total_loss = (
-        beat_loss
-        + downbeat_loss
-        + meter_loss
-        + drum_aux_loss
-        + repeat_consistency_loss
+        beat_loss + downbeat_loss + meter_loss + drum_aux_loss + repeat_consistency_loss
     )
     return total_loss, {
         "loss": float(total_loss.detach()),
@@ -1454,8 +1450,7 @@ def main() -> None:
     print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(
-        "drum_aux_use_high_frequency_flux="
-        f"{args.drum_aux_use_high_frequency_flux}"
+        "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
     )
     print(f"repeat_consistency_loss_weight={args.repeat_consistency_loss_weight}")
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
