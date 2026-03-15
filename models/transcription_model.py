@@ -241,7 +241,7 @@ class BeatTranscriptionOutput:
     meter_logits: Optional[torch.Tensor] = None
     broadband_flux_logits: Optional[torch.Tensor] = None
     onset_env_logits: Optional[torch.Tensor] = None
-    piano_broadband_flux_logits: Optional[torch.Tensor] = None
+    high_frequency_flux_logits: Optional[torch.Tensor] = None
     frame_features: Optional[torch.Tensor] = None
     context_features: Optional[torch.Tensor] = None
     intermediate_features: Optional[List[torch.Tensor]] = None
@@ -407,28 +407,24 @@ class DrumAuxHead(nn.Module):
     drums stem 由来の補助系列を回帰する小さな head。
     """
 
-    def __init__(self, input_dim: int):
+    def __init__(self, input_dim: int, use_high_frequency_flux: bool = False):
         super().__init__()
         self.broadband_flux = nn.Linear(input_dim, 1)
         self.onset_env = nn.Linear(input_dim, 1)
+        self.high_frequency_flux = (
+            nn.Linear(input_dim, 1) if use_high_frequency_flux else None
+        )
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         broadband_flux_logits = self.broadband_flux(x).squeeze(-1)
         onset_env_logits = self.onset_env(x).squeeze(-1)
-        return broadband_flux_logits, onset_env_logits
-
-
-class PianoAuxHead(nn.Module):
-    """
-    piano stem 由来の broadband flux を回帰する小さな head。
-    """
-
-    def __init__(self, input_dim: int):
-        super().__init__()
-        self.broadband_flux = nn.Linear(input_dim, 1)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.broadband_flux(x).squeeze(-1)
+        if self.high_frequency_flux is None:
+            high_frequency_flux_logits = None
+        else:
+            high_frequency_flux_logits = self.high_frequency_flux(x).squeeze(-1)
+        return broadband_flux_logits, onset_env_logits, high_frequency_flux_logits
 
 
 class BeatDownbeatHead(nn.Module):
@@ -441,7 +437,7 @@ class BeatDownbeatHead(nn.Module):
         input_dim: int,
         num_meter_classes: int,
         use_drum_aux_head: bool = False,
-        use_piano_aux_head: bool = False,
+        use_drum_high_frequency_flux: bool = False,
         dropout: float = 0.0,
     ):
         super().__init__()
@@ -451,8 +447,14 @@ class BeatDownbeatHead(nn.Module):
         self.downbeat_head = nn.Linear(input_dim, 1)
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
-        self.drum_aux_head = DrumAuxHead(input_dim) if use_drum_aux_head else None
-        self.piano_aux_head = PianoAuxHead(input_dim) if use_piano_aux_head else None
+        self.drum_aux_head = (
+            DrumAuxHead(
+                input_dim,
+                use_high_frequency_flux=use_drum_high_frequency_flux,
+            )
+            if use_drum_aux_head
+            else None
+        )
 
     def forward(self, frame_features: torch.Tensor) -> BeatTranscriptionOutput:
         x = self.norm(frame_features)
@@ -466,12 +468,13 @@ class BeatDownbeatHead(nn.Module):
         if self.drum_aux_head is None:
             broadband_flux_logits = None
             onset_env_logits = None
+            high_frequency_flux_logits = None
         else:
-            broadband_flux_logits, onset_env_logits = self.drum_aux_head(x)
-        if self.piano_aux_head is None:
-            piano_broadband_flux_logits = None
-        else:
-            piano_broadband_flux_logits = self.piano_aux_head(x)
+            (
+                broadband_flux_logits,
+                onset_env_logits,
+                high_frequency_flux_logits,
+            ) = self.drum_aux_head(x)
         logits = torch.stack([beat_logits, downbeat_logits], dim=-1)
 
         return BeatTranscriptionOutput(
@@ -481,7 +484,7 @@ class BeatDownbeatHead(nn.Module):
             meter_logits=meter_logits,
             broadband_flux_logits=broadband_flux_logits,
             onset_env_logits=onset_env_logits,
-            piano_broadband_flux_logits=piano_broadband_flux_logits,
+            high_frequency_flux_logits=high_frequency_flux_logits,
         )
 
 
@@ -496,7 +499,7 @@ class BeatTranscriptionModel(nn.Module):
         backbone: Backbone,
         num_meter_classes: int,
         use_drum_aux_head: bool = False,
-        use_piano_aux_head: bool = False,
+        use_drum_high_frequency_flux: bool = False,
         head_dropout: float = 0.0,
     ):
         super().__init__()
@@ -505,7 +508,7 @@ class BeatTranscriptionModel(nn.Module):
             backbone.output_dim,
             num_meter_classes=num_meter_classes,
             use_drum_aux_head=use_drum_aux_head,
-            use_piano_aux_head=use_piano_aux_head,
+            use_drum_high_frequency_flux=use_drum_high_frequency_flux,
             dropout=head_dropout,
         )
 

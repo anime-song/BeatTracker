@@ -28,7 +28,7 @@ class ExperimentSummary:
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
     drum_aux_loss_weight: Optional[float]
-    piano_aux_loss_weight: Optional[float]
+    drum_aux_use_high_frequency_flux: Optional[bool]
     stem_dropout_max_count: Optional[int]
     init_scope: Optional[str]
     init_from: Optional[str]
@@ -75,9 +75,9 @@ class ExperimentSummary:
             "drum_aux_loss_weight": _format_float(
                 self.drum_aux_loss_weight, digits=3
             ),
-            "piano_aux_loss_weight": _format_float(
-                self.piano_aux_loss_weight, digits=3
-            ),
+            "drum_aux_use_high_frequency_flux": ""
+            if self.drum_aux_use_high_frequency_flux is None
+            else str(self.drum_aux_use_high_frequency_flux).lower(),
             "stem_dropout_max_count": _format_int(self.stem_dropout_max_count),
             "init_scope": self.init_scope or "",
             "init_from": self.init_from or "",
@@ -239,7 +239,9 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
         drum_aux_loss_weight=_as_float(config.get("drum_aux_loss_weight")),
-        piano_aux_loss_weight=_as_float(config.get("piano_aux_loss_weight")),
+        drum_aux_use_high_frequency_flux=_as_bool(
+            config.get("drum_aux_use_high_frequency_flux")
+        ),
         stem_dropout_max_count=_as_int(config.get("stem_dropout_max_count")),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
@@ -302,7 +304,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "segment_seconds",
         "meter_loss_weight",
         "drum_aux_loss_weight",
-        "piano_aux_loss_weight",
+        "drum_aux_use_high_frequency_flux",
         "stem_dropout_max_count",
         "init_scope",
         "init_from",
@@ -359,7 +361,9 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
             _format_float(summary.drum_aux_loss_weight, digits=3) or "-",
-            _format_float(summary.piano_aux_loss_weight, digits=3) or "-",
+            "-"
+            if summary.drum_aux_use_high_frequency_flux is None
+            else str(summary.drum_aux_use_high_frequency_flux).lower(),
             _format_int(summary.stem_dropout_max_count) or "-",
             (
                 summary.init_scope
@@ -386,7 +390,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "batch",
                 "meter_w",
                 "drum_aux_w",
-                "piano_aux_w",
+                "drum_hf",
                 "stem_drop",
                 "init",
                 "model",
@@ -444,9 +448,10 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                             or "-",
                         ],
                         [
-                            "piano_aux_loss_weight",
-                            _format_float(summary.piano_aux_loss_weight, digits=3)
-                            or "-",
+                            "drum_aux_use_high_frequency_flux",
+                            "-"
+                            if summary.drum_aux_use_high_frequency_flux is None
+                            else str(summary.drum_aux_use_high_frequency_flux).lower(),
                         ],
                         [
                             "stem_dropout_max_count",

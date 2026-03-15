@@ -1,17 +1,18 @@
 # Experiment Summary
 
-Generated: 2026-03-15 01:58:49 UTC
+Generated: 2026-03-15 03:29:34 UTC
 
-Runs: 27
+Runs: 28
 
-| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | piano_aux_w | stem_drop | init | model | branch |
+| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | stem_drop | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
 | exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
 | exp_chord_preinit_stemdrop2_drumaux_basslowflux | complete | 17 | 0.4536 | 30 | 0.4387 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
 | exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
 | exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | - | - | - | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
 | exp_chord_preinit_stemdrop2_drumaux_bassaux | complete | 20 | 0.4442 | 30 | 0.4281 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
-| exp_chord_preinit_stemdrop2_drumaux_pianoaux | complete | 16 | 0.4440 | 30 | 0.4029 | 42 | 0.000300 | 8 | 0.050 | 0.100 | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/piano-broadband-flux-aux |
+| exp_chord_preinit_stemdrop2_drumaux_pianoaux | complete | 16 | 0.4440 | 30 | 0.4029 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/piano-broadband-flux-aux |
 | exp_chord_preinit_stemdrop2_phase | complete | 25 | 0.4409 | 30 | 0.4318 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/beat-phase-classification |
 | exp_chord_preinit_stemdrop2_drumaux_bassharmonic | complete | 12 | 0.4406 | 30 | 0.4150 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
 | exp_chord_preinit_stemdrop2_metertau0_5 | complete | 16 | 0.4401 | 30 | 0.4131 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/meter-balancedsoftmax-tau0_5 |
@@ -34,6 +35,40 @@ Runs: 27
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
 
+## exp_chord_preinit_stemdrop2_drumaux_highfreq
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_highfreq |
+| status | complete |
+| best_epoch | 25 |
+| best_downbeat_f1 | 0.4642 |
+| best_beat_f1 | 0.6441 |
+| best_val_loss | 1.3692 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4510 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/drum-highfreq-flux-aux |
+| git_commit | e61c0b4e430a6f79535e8c907c0e5b0783051b4c |
+| git_dirty | true |
+
 ## exp_chord_preinit_stemdrop2_drumaux
 
 | field | value |
@@ -54,7 +89,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -88,7 +123,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -122,7 +157,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -156,7 +191,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -190,7 +225,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -224,7 +259,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
-| piano_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -258,7 +293,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | /mnt/f/Github/BeatTracker/model_epoch_200.pt |
@@ -292,7 +327,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -326,7 +361,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -360,7 +395,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -394,7 +429,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -428,7 +463,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -462,7 +497,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -496,7 +531,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -530,7 +565,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -564,7 +599,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.100 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -598,7 +633,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -632,7 +667,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -666,7 +701,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -700,7 +735,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -734,7 +769,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -768,7 +803,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -802,7 +837,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.300 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -836,7 +871,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -870,7 +905,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -904,7 +939,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -938,7 +973,7 @@ Runs: 27
 | segment_seconds | 30.0 |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
-| piano_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |

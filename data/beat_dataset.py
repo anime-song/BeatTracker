@@ -472,6 +472,7 @@ class BeatStemDataset(Dataset):
         self.aux_target_builder = StemAuxTargetBuilder(
             stem_names=self.stem_names,
             channels_per_stem=self.channels_per_stem,
+            sample_rate=self.sample_rate,
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             target_num_frames=self.target_num_frames,
@@ -828,7 +829,7 @@ class BeatStemDataset(Dataset):
             "meter_targets": meter_targets,
             "broadband_flux_targets": aux_targets.broadband_flux_targets,
             "onset_env_targets": aux_targets.onset_env_targets,
-            "piano_broadband_flux_targets": aux_targets.piano_broadband_flux_targets,
+            "high_frequency_flux_targets": aux_targets.high_frequency_flux_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

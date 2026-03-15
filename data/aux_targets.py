@@ -36,7 +36,7 @@ def _smooth_1d_series(x: torch.Tensor, kernel_size: int = 5) -> torch.Tensor:
 class StemAuxTargets:
     broadband_flux_targets: torch.Tensor
     onset_env_targets: torch.Tensor
-    piano_broadband_flux_targets: torch.Tensor
+    high_frequency_flux_targets: torch.Tensor
 
 
 class StemAuxTargetBuilder:
@@ -51,37 +51,37 @@ class StemAuxTargetBuilder:
         self,
         stem_names: Sequence[str],
         channels_per_stem: int,
+        sample_rate: int,
         n_fft: int,
         hop_length: int,
         target_num_frames: int,
+        high_frequency_min_hz: float = 2000.0,
     ) -> None:
         self.stem_names = tuple(stem_names)
         self.channels_per_stem = int(channels_per_stem)
+        self.sample_rate = int(sample_rate)
         self.n_fft = int(n_fft)
         self.hop_length = int(hop_length)
         self.target_num_frames = int(target_num_frames)
+        self.high_frequency_min_hz = float(high_frequency_min_hz)
 
         if "drums" not in self.stem_names:
             raise ValueError("auxiliary targets require a 'drums' stem")
-        if "piano" not in self.stem_names:
-            raise ValueError("auxiliary targets require a 'piano' stem")
-
         self.drums_stem_index = self.stem_names.index("drums")
-        self.piano_stem_index = self.stem_names.index("piano")
 
     def build(self, waveform: torch.Tensor, valid_frames: int) -> StemAuxTargets:
-        broadband_flux_targets, onset_env_targets = self._compute_drum_aux_targets(
-            waveform=waveform,
-            valid_frames=valid_frames,
-        )
-        piano_broadband_flux_targets = self._compute_piano_aux_targets(
+        (
+            broadband_flux_targets,
+            onset_env_targets,
+            high_frequency_flux_targets,
+        ) = self._compute_drum_aux_targets(
             waveform=waveform,
             valid_frames=valid_frames,
         )
         return StemAuxTargets(
             broadband_flux_targets=broadband_flux_targets,
             onset_env_targets=onset_env_targets,
-            piano_broadband_flux_targets=piano_broadband_flux_targets,
+            high_frequency_flux_targets=high_frequency_flux_targets,
         )
 
     def _extract_mono_stem(
@@ -131,48 +131,48 @@ class StemAuxTargetBuilder:
         flux = F.pad(diff.sum(dim=1), (1, 0)).squeeze(0)
         return _minmax_normalize_1d(flux)
 
+    def _compute_high_frequency_flux(self, mono_waveform: torch.Tensor) -> torch.Tensor:
+        mag = self._compute_log_magnitude(mono_waveform)
+        freqs = torch.linspace(
+            0.0,
+            self.sample_rate / 2.0,
+            mag.shape[1],
+            dtype=mag.dtype,
+            device=mag.device,
+        )
+        high_freq_mask = freqs >= self.high_frequency_min_hz
+        if not bool(high_freq_mask.any()):
+            return torch.zeros(mag.shape[-1], dtype=mag.dtype, device=mag.device)
+
+        mag = mag[:, high_freq_mask, :]
+        diff = F.relu(mag[:, :, 1:] - mag[:, :, :-1])
+        flux = F.pad(diff.sum(dim=1), (1, 0)).squeeze(0)
+        return _minmax_normalize_1d(flux)
+
     def _compute_drum_aux_targets(
         self,
         waveform: torch.Tensor,
         valid_frames: int,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         empty = torch.zeros(
             self.target_num_frames,
             dtype=torch.float32,
             device=waveform.device,
         )
         if valid_frames <= 0:
-            return empty, empty.clone()
+            return empty, empty.clone(), empty.clone()
 
         drums_waveform = self._extract_mono_stem(
             waveform=waveform,
             stem_index=self.drums_stem_index,
         )
         broadband_flux = self._compute_broadband_flux(drums_waveform)
+        high_frequency_flux = self._compute_high_frequency_flux(drums_waveform)
         onset_envelope = _smooth_1d_series(broadband_flux, kernel_size=5)
         onset_envelope = _minmax_normalize_1d(onset_envelope)
 
         return (
             self._pad_to_target_length(broadband_flux, valid_frames),
             self._pad_to_target_length(onset_envelope, valid_frames),
+            self._pad_to_target_length(high_frequency_flux, valid_frames),
         )
-
-    def _compute_piano_aux_targets(
-        self,
-        waveform: torch.Tensor,
-        valid_frames: int,
-    ) -> torch.Tensor:
-        empty = torch.zeros(
-            self.target_num_frames,
-            dtype=torch.float32,
-            device=waveform.device,
-        )
-        if valid_frames <= 0:
-            return empty
-
-        piano_waveform = self._extract_mono_stem(
-            waveform=waveform,
-            stem_index=self.piano_stem_index,
-        )
-        piano_broadband_flux = self._compute_broadband_flux(piano_waveform)
-        return self._pad_to_target_length(piano_broadband_flux, valid_frames)
