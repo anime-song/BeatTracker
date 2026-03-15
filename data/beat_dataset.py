@@ -16,6 +16,8 @@ import torchaudio
 import torchaudio.functional as AF
 from torch.utils.data import Dataset
 
+from .aux_targets import StemAuxTargetBuilder
+
 
 DEFAULT_STEM_NAMES = ("bass", "drums", "guitar", "other", "piano", "vocals")
 PITCH_SUFFIX_PATTERN = re.compile(r"_pitch_(-?\d+)st$")
@@ -466,6 +468,15 @@ class BeatStemDataset(Dataset):
             raise ValueError("segment_seconds is too short for the configured n_fft")
         # モデル側の crop_length と一致するよう、center=True の STFT/CQT を前提にした長さで持つ。
         self.target_num_frames = 1 + ((self.segment_samples - self.n_fft) // self.hop_length)
+        # 補助ターゲット生成は別クラスに切り出して、dataset 本体を薄く保つ。
+        self.aux_target_builder = StemAuxTargetBuilder(
+            stem_names=self.stem_names,
+            channels_per_stem=self.channels_per_stem,
+            sample_rate=self.sample_rate,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            target_num_frames=self.target_num_frames,
+        )
 
         self.songs = songs
         detected_meter_labels = {
@@ -806,12 +817,19 @@ class BeatStemDataset(Dataset):
             target_num_frames=self.target_num_frames,
             valid_frames=valid_frames,
         )
+        aux_targets = self.aux_target_builder.build(
+            waveform=waveform,
+            valid_frames=valid_frames,
+        )
 
         return {
             "waveform": waveform,
             "beat_targets": beat_targets,
             "downbeat_targets": downbeat_targets,
             "meter_targets": meter_targets,
+            "broadband_flux_targets": aux_targets.broadband_flux_targets,
+            "onset_env_targets": aux_targets.onset_env_targets,
+            "high_frequency_flux_targets": aux_targets.high_frequency_flux_targets,
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

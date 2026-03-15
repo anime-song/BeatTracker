@@ -32,7 +32,8 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
-from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss
+from training.augmentations import apply_ranked_stem_dropout
+from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss, masked_l1_loss
 
 
 class ValidationSegmentDataset(Dataset):
@@ -246,7 +247,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
-    parser.add_argument("--meter-loss-weight", type=float, default=0.1)
+    parser.add_argument("--meter-loss-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--drum-aux-loss-weight",
+        type=float,
+        default=0.1,
+        help="drums stem から作った flux / onset 補助回帰 loss の重み。",
+    )
+    parser.add_argument(
+        "--drum-aux-use-high-frequency-flux",
+        action="store_true",
+        help="drums stem 由来の high-frequency flux 回帰も補助 loss に含める。",
+    )
+    parser.add_argument(
+        "--stem-dropout-max-count",
+        type=int,
+        default=4,
+        help="train 時にエネルギーの小さい stem から最大何本まで落とすか。0 で無効。",
+    )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -451,6 +469,8 @@ def build_model(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=train_dataset.num_meter_classes,
+        use_drum_aux_head=args.drum_aux_loss_weight > 0.0,
+        use_drum_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
         head_dropout=args.head_dropout,
     )
 
@@ -642,6 +662,8 @@ def compute_loss(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    drum_aux_loss_weight: float,
+    drum_aux_use_high_frequency_flux: bool,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if output.meter_logits is None:
         raise ValueError("Model output must include meter_logits")
@@ -670,8 +692,47 @@ def compute_loss(
     else:
         meter_accuracy = 0.0
 
-    # 今回は重みづけを増やさず、3 タスクの和をそのまま最適化する。
-    total_loss = beat_loss + downbeat_loss + meter_loss
+    raw_drum_aux_loss = beat_loss.new_tensor(0.0)
+    broadband_flux_loss = beat_loss.new_tensor(0.0)
+    onset_env_loss = beat_loss.new_tensor(0.0)
+    high_frequency_flux_loss = beat_loss.new_tensor(0.0)
+    if drum_aux_loss_weight > 0.0:
+        if output.broadband_flux_logits is None or output.onset_env_logits is None:
+            raise ValueError("Model output must include drum auxiliary logits")
+
+        valid_mask = batch["valid_mask"]
+        broadband_flux_predictions = torch.sigmoid(output.broadband_flux_logits)
+        onset_env_predictions = torch.sigmoid(output.onset_env_logits)
+        broadband_flux_loss = masked_l1_loss(
+            broadband_flux_predictions,
+            batch["broadband_flux_targets"],
+            valid_mask,
+        )
+        onset_env_loss = masked_l1_loss(
+            onset_env_predictions,
+            batch["onset_env_targets"],
+            valid_mask,
+        )
+        raw_drum_aux_loss = broadband_flux_loss + onset_env_loss
+        if drum_aux_use_high_frequency_flux:
+            if output.high_frequency_flux_logits is None:
+                raise ValueError(
+                    "Model output must include high-frequency drum auxiliary logits"
+                )
+            high_frequency_flux_predictions = torch.sigmoid(
+                output.high_frequency_flux_logits
+            )
+            high_frequency_flux_loss = masked_l1_loss(
+                high_frequency_flux_predictions,
+                batch["high_frequency_flux_targets"],
+                valid_mask,
+            )
+            raw_drum_aux_loss = raw_drum_aux_loss + high_frequency_flux_loss
+
+    drum_aux_loss = raw_drum_aux_loss * drum_aux_loss_weight
+
+    # 補助タスクは meter と drum aux を足す。
+    total_loss = beat_loss + downbeat_loss + meter_loss + drum_aux_loss
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
@@ -679,6 +740,11 @@ def compute_loss(
         "meter_loss": float(meter_loss.detach()),
         "raw_meter_loss": float(raw_meter_loss.detach()),
         "meter_accuracy": meter_accuracy,
+        "drum_aux_loss": float(drum_aux_loss.detach()),
+        "raw_drum_aux_loss": float(raw_drum_aux_loss.detach()),
+        "broadband_flux_loss": float(broadband_flux_loss.detach()),
+        "onset_env_loss": float(onset_env_loss.detach()),
+        "high_frequency_flux_loss": float(high_frequency_flux_loss.detach()),
     }
 
 
@@ -779,6 +845,10 @@ def train_one_epoch(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    drum_aux_loss_weight: float,
+    drum_aux_use_high_frequency_flux: bool,
+    num_stems: int,
+    stem_dropout_max_count: int,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -800,6 +870,15 @@ def train_one_epoch(
         batch = move_batch_to_device(batch, device)
         optimizer.zero_grad(set_to_none=True)
 
+        dropped_stem_count = 0.0
+        if stem_dropout_max_count > 0:
+            batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
+                batch["waveform"],
+                num_stems=num_stems,
+                max_dropout_stems=stem_dropout_max_count,
+            )
+            dropped_stem_count = float(dropped_counts.float().mean().item())
+
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
             if use_amp and device.type == "cuda"
@@ -813,7 +892,10 @@ def train_one_epoch(
                 downbeat_loss_fn,
                 meter_loss_fn,
                 meter_loss_weight,
+                drum_aux_loss_weight,
+                drum_aux_use_high_frequency_flux,
             )
+            loss_info["stem_dropout_count"] = dropped_stem_count
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -862,6 +944,36 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/drum_aux_loss",
+                loss_info["drum_aux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_drum_aux_loss",
+                loss_info["raw_drum_aux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/broadband_flux_loss",
+                loss_info["broadband_flux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/onset_env_loss",
+                loss_info["onset_env_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/high_frequency_flux_loss",
+                loss_info["high_frequency_flux_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/stem_dropout_count",
+                loss_info["stem_dropout_count"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/lr", optimizer.param_groups[0]["lr"], global_step
             )
 
@@ -871,6 +983,7 @@ def train_one_epoch(
                 beat=f"{loss_info['beat_loss']:.4f}",
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
+                drum=f"{loss_info['drum_aux_loss']:.4f}",
             )
 
     return tracker.averages(), global_step
@@ -884,6 +997,8 @@ def validate(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    drum_aux_loss_weight: float,
+    drum_aux_use_high_frequency_flux: bool,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -927,6 +1042,8 @@ def validate(
             downbeat_loss_fn,
             meter_loss_fn,
             meter_loss_weight,
+            drum_aux_loss_weight,
+            drum_aux_use_high_frequency_flux,
         )
 
         tracker.update(loss_info)
@@ -1086,6 +1203,12 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "meter_loss",
         "raw_meter_loss",
         "meter_accuracy",
+        "drum_aux_loss",
+        "raw_drum_aux_loss",
+        "broadband_flux_loss",
+        "onset_env_loss",
+        "high_frequency_flux_loss",
+        "stem_dropout_count",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1176,6 +1299,8 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
+            "drum_aux_use_high_frequency_flux": args.drum_aux_use_high_frequency_flux,
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1200,6 +1325,12 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
+    print(
+        "drum_aux_use_high_frequency_flux="
+        f"{args.drum_aux_use_high_frequency_flux}"
+    )
+    print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1244,6 +1375,10 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                drum_aux_loss_weight=args.drum_aux_loss_weight,
+                drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
+                num_stems=len(train_dataset.stem_names),
+                stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
@@ -1260,6 +1395,8 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                drum_aux_loss_weight=args.drum_aux_loss_weight,
+                drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,

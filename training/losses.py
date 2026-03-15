@@ -58,6 +58,20 @@ class BalancedSoftmaxLoss(nn.Module):
         return loss
 
 
+def masked_l1_loss(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    diff = (predictions - targets).abs()
+    if mask is None:
+        return diff.mean()
+
+    weighted = diff * mask.to(diff.dtype)
+    normalizer = mask.sum().clamp_min(1.0).to(diff.dtype)
+    return weighted.sum() / normalizer
+
+
 # https://github.com/CPJKU/beat_this/blob/main/beat_this/model/loss.py
 class ShiftTolerantBCELoss(torch.nn.Module):
     """

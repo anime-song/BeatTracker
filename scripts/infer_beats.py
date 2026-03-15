@@ -194,6 +194,33 @@ def infer_num_meter_classes(
     return int(weight.shape[0])
 
 
+def infer_use_drum_aux_head(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> bool:
+    # config に保存されていればそれを優先し、古い checkpoint は key の有無で推定する。
+    if "use_drum_aux_head" in config:
+        return bool(config["use_drum_aux_head"])
+
+    return any(
+        key.startswith("head.drum_aux_head.")
+        for key in state_dict.keys()
+    )
+
+
+def infer_use_drum_high_frequency_flux(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> bool:
+    if "drum_aux_use_high_frequency_flux" in config:
+        return bool(config["drum_aux_use_high_frequency_flux"])
+
+    return any(
+        key.startswith("head.drum_aux_head.high_frequency_flux.")
+        for key in state_dict.keys()
+    )
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -462,6 +489,8 @@ def build_model_from_config(
     num_audio_channels: int,
     num_stems: int,
     num_meter_classes: int,
+    use_drum_aux_head: bool,
+    use_drum_high_frequency_flux: bool,
 ) -> BeatTranscriptionModel:
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=int(config["sample_rate"]),
@@ -484,6 +513,8 @@ def build_model_from_config(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=num_meter_classes,
+        use_drum_aux_head=use_drum_aux_head,
+        use_drum_high_frequency_flux=use_drum_high_frequency_flux,
         head_dropout=float(config.get("head_dropout", 0.0)),
     )
 
@@ -888,11 +919,17 @@ def main() -> None:
         )
 
     num_meter_classes = infer_num_meter_classes(state_dict, config)
+    use_drum_aux_head = infer_use_drum_aux_head(state_dict, config)
+    use_drum_high_frequency_flux = infer_use_drum_high_frequency_flux(
+        state_dict, config
+    )
     model = build_model_from_config(
         config=config,
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
         num_stems=len(args.stem_names),
         num_meter_classes=num_meter_classes,
+        use_drum_aux_head=use_drum_aux_head,
+        use_drum_high_frequency_flux=use_drum_high_frequency_flux,
     )
     model.load_state_dict(state_dict, strict=True)
 
