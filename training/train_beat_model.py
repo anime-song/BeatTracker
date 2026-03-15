@@ -33,7 +33,14 @@ from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
 from training.augmentations import apply_ranked_stem_dropout
-from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss, masked_l1_loss
+from training.losses import (
+    BalancedSoftmaxLoss,
+    ShiftTolerantBCELoss,
+    masked_index_pair_l1_loss,
+    masked_l1_loss,
+)
+
+DEFAULT_INIT_FROM = Path("model_epoch_200.pt")
 
 
 class ValidationSegmentDataset(Dataset):
@@ -213,7 +220,7 @@ def parse_args() -> argparse.Namespace:
         "--init-from",
         type=Path,
         default=None,
-        help="学習初期値として使う checkpoint。resume と違って optimizer は復元しない。",
+        help="学習初期値として使う checkpoint。未指定時は model_epoch_200.pt があればそれを使う。",
     )
     parser.add_argument(
         "--init-scope",
@@ -256,8 +263,58 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--drum-aux-use-high-frequency-flux",
+        dest="drum_aux_use_high_frequency_flux",
         action="store_true",
         help="drums stem 由来の high-frequency flux 回帰も補助 loss に含める。",
+    )
+    parser.add_argument(
+        "--disable-drum-aux-use-high-frequency-flux",
+        dest="drum_aux_use_high_frequency_flux",
+        action="store_false",
+        help="drums stem 由来の high-frequency flux 回帰を無効にする。",
+    )
+    parser.add_argument(
+        "--repeat-consistency-loss-weight",
+        type=float,
+        default=0.1,
+        help="繰り返し区間ペア上で downbeat 出力を似せる補助 loss の重み。0 で無効。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-sync-unit",
+        type=str,
+        choices=("beat", "bar"),
+        default="beat",
+        help="SSM を beat 単位で作るか、bar 単位で作るか。bar の方が構造反復寄りになりやすい。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-threshold",
+        type=float,
+        default=0.85,
+        help="SSM 上で『似ている』とみなす最小類似度。上げるほど候補は減り、厳しくなる。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-min-length-beats",
+        type=int,
+        default=8,
+        help="採用する対角線 run の最小長。sync_unit=beat なら beat 数、bar なら bar 数として解釈する。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-near-diagonal-margin-beats",
+        type=int,
+        default=16,
+        help="主対角線に近すぎる候補を捨てるための最小オフセット。sync_unit=beat なら beat 数、bar なら bar 数。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-max-length-beats",
+        type=int,
+        default=16,
+        help="1 本の対角線 run から使う最大長。長すぎる run を切って局所反復の暴走を抑える。",
+    )
+    parser.add_argument(
+        "--repeat-ssm-max-pairs",
+        type=int,
+        default=128,
+        help="1 サンプルあたりに保持する frame ペア数の上限。大きいほど loss には多く入るが、ノイズも増えやすい。",
     )
     parser.add_argument(
         "--stem-dropout-max-count",
@@ -287,6 +344,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-lr-ratio", type=float, default=0.1)
     parser.add_argument("--ema-decay", type=float, default=0.999)
     parser.add_argument("--disable-ema", action="store_true")
+    parser.set_defaults(drum_aux_use_high_frequency_flux=True)
     return parser.parse_args()
 
 
@@ -406,6 +464,13 @@ def build_dataloaders(
         packed_audio_dir=args.packed_audio_dir,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
+        enable_repeat_pair_targets=args.repeat_consistency_loss_weight > 0.0,
+        repeat_ssm_sync_unit=args.repeat_ssm_sync_unit,
+        repeat_ssm_threshold=args.repeat_ssm_threshold,
+        repeat_ssm_min_length_beats=args.repeat_ssm_min_length_beats,
+        repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
+        repeat_ssm_max_length_beats=args.repeat_ssm_max_length_beats,
+        repeat_ssm_max_pairs=args.repeat_ssm_max_pairs,
     )
     val_base_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
@@ -420,6 +485,13 @@ def build_dataloaders(
         meter_to_index=train_dataset.meter_to_index,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
+        enable_repeat_pair_targets=args.repeat_consistency_loss_weight > 0.0,
+        repeat_ssm_sync_unit=args.repeat_ssm_sync_unit,
+        repeat_ssm_threshold=args.repeat_ssm_threshold,
+        repeat_ssm_min_length_beats=args.repeat_ssm_min_length_beats,
+        repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
+        repeat_ssm_max_length_beats=args.repeat_ssm_max_length_beats,
+        repeat_ssm_max_pairs=args.repeat_ssm_max_pairs,
     )
     val_dataset = ValidationSegmentDataset(val_base_dataset, semitone=None)
 
@@ -664,6 +736,7 @@ def compute_loss(
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
+    repeat_consistency_loss_weight: float,
 ) -> tuple[torch.Tensor, dict[str, float]]:
     if output.meter_logits is None:
         raise ValueError("Model output must include meter_logits")
@@ -731,8 +804,26 @@ def compute_loss(
 
     drum_aux_loss = raw_drum_aux_loss * drum_aux_loss_weight
 
-    # 補助タスクは meter と drum aux を足す。
-    total_loss = beat_loss + downbeat_loss + meter_loss + drum_aux_loss
+    raw_repeat_consistency_loss = beat_loss.new_tensor(0.0)
+    repeat_pair_count = 0.0
+    if repeat_consistency_loss_weight > 0.0:
+        repeat_pair_mask = batch["repeat_pair_mask"]
+        repeat_pair_count = float(repeat_pair_mask.sum().item())
+        if repeat_pair_count > 0.0:
+            downbeat_probabilities = torch.sigmoid(output.downbeat_logits)
+            raw_repeat_consistency_loss = masked_index_pair_l1_loss(
+                downbeat_probabilities,
+                batch["repeat_pair_indices"],
+                repeat_pair_mask,
+            )
+    repeat_consistency_loss = (
+        raw_repeat_consistency_loss * repeat_consistency_loss_weight
+    )
+
+    # 補助タスクは meter / drum aux / repeat consistency を足す。
+    total_loss = (
+        beat_loss + downbeat_loss + meter_loss + drum_aux_loss + repeat_consistency_loss
+    )
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
@@ -745,6 +836,9 @@ def compute_loss(
         "broadband_flux_loss": float(broadband_flux_loss.detach()),
         "onset_env_loss": float(onset_env_loss.detach()),
         "high_frequency_flux_loss": float(high_frequency_flux_loss.detach()),
+        "repeat_consistency_loss": float(repeat_consistency_loss.detach()),
+        "raw_repeat_consistency_loss": float(raw_repeat_consistency_loss.detach()),
+        "repeat_pair_count": repeat_pair_count,
     }
 
 
@@ -847,6 +941,7 @@ def train_one_epoch(
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
+    repeat_consistency_loss_weight: float,
     num_stems: int,
     stem_dropout_max_count: int,
     device: torch.device,
@@ -894,6 +989,7 @@ def train_one_epoch(
                 meter_loss_weight,
                 drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux,
+                repeat_consistency_loss_weight,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
 
@@ -969,6 +1065,21 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/repeat_consistency_loss",
+                loss_info["repeat_consistency_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_repeat_consistency_loss",
+                loss_info["raw_repeat_consistency_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/repeat_pair_count",
+                loss_info["repeat_pair_count"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/stem_dropout_count",
                 loss_info["stem_dropout_count"],
                 global_step,
@@ -984,6 +1095,7 @@ def train_one_epoch(
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
+                repeat=f"{loss_info['repeat_consistency_loss']:.4f}",
             )
 
     return tracker.averages(), global_step
@@ -999,6 +1111,7 @@ def validate(
     meter_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
+    repeat_consistency_loss_weight: float,
     device: torch.device,
     beat_threshold: float,
     downbeat_threshold: float,
@@ -1044,6 +1157,7 @@ def validate(
             meter_loss_weight,
             drum_aux_loss_weight,
             drum_aux_use_high_frequency_flux,
+            repeat_consistency_loss_weight,
         )
 
         tracker.update(loss_info)
@@ -1208,6 +1322,9 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "broadband_flux_loss",
         "onset_env_loss",
         "high_frequency_flux_loss",
+        "repeat_consistency_loss",
+        "raw_repeat_consistency_loss",
+        "repeat_pair_count",
         "stem_dropout_count",
         "beat_precision",
         "beat_recall",
@@ -1224,6 +1341,11 @@ def main() -> None:
     args = parse_args()
     set_seed(args.seed)
     project_root = Path(__file__).resolve().parent.parent
+
+    if args.resume is None and args.init_from is None and DEFAULT_INIT_FROM.exists():
+        # 現時点の best 設定は chord 事前学習 backbone を初期値に使うので、
+        # 未指定時はその checkpoint を既定として扱う。
+        args.init_from = DEFAULT_INIT_FROM
 
     if args.resume is not None and args.init_from is not None:
         raise ValueError("--resume and --init-from cannot be used together")
@@ -1301,6 +1423,7 @@ def main() -> None:
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
             "drum_aux_use_high_frequency_flux": args.drum_aux_use_high_frequency_flux,
+            "repeat_consistency_loss_weight": args.repeat_consistency_loss_weight,
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1327,9 +1450,9 @@ def main() -> None:
     print(f"meter_loss_weight={args.meter_loss_weight}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(
-        "drum_aux_use_high_frequency_flux="
-        f"{args.drum_aux_use_high_frequency_flux}"
+        "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
     )
+    print(f"repeat_consistency_loss_weight={args.repeat_consistency_loss_weight}")
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
@@ -1377,6 +1500,7 @@ def main() -> None:
                 meter_loss_weight=args.meter_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
+                repeat_consistency_loss_weight=args.repeat_consistency_loss_weight,
                 num_stems=len(train_dataset.stem_names),
                 stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
@@ -1397,6 +1521,7 @@ def main() -> None:
                 meter_loss_weight=args.meter_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
+                repeat_consistency_loss_weight=args.repeat_consistency_loss_weight,
                 device=device,
                 beat_threshold=args.beat_threshold,
                 downbeat_threshold=args.downbeat_threshold,

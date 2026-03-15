@@ -17,6 +17,7 @@ import torchaudio.functional as AF
 from torch.utils.data import Dataset
 
 from .aux_targets import StemAuxTargetBuilder
+from .repeat_pairs import RepeatPairBuilder
 
 
 DEFAULT_STEM_NAMES = ("bass", "drums", "guitar", "other", "piano", "vocals")
@@ -284,6 +285,13 @@ class BeatStemDataset(Dataset):
         audio_backend: str = "wav",
         packed_audio_dir: Optional[str | Path] = None,
         meter_to_index: Optional[Dict[str, int]] = None,
+        enable_repeat_pair_targets: bool = False,
+        repeat_ssm_sync_unit: str = "beat",
+        repeat_ssm_threshold: float = 0.85,
+        repeat_ssm_min_length_beats: int = 8,
+        repeat_ssm_near_diagonal_margin_beats: int = 16,
+        repeat_ssm_max_length_beats: int = 16,
+        repeat_ssm_max_pairs: int = 128,
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
     ) -> None:
@@ -307,6 +315,8 @@ class BeatStemDataset(Dataset):
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
         self.meter_ignore_index = -100
+        self.enable_repeat_pair_targets = bool(enable_repeat_pair_targets)
+        self.repeat_ssm_max_pairs = int(repeat_ssm_max_pairs)
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
@@ -476,6 +486,24 @@ class BeatStemDataset(Dataset):
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             target_num_frames=self.target_num_frames,
+        )
+        self.repeat_pair_builder = (
+            RepeatPairBuilder(
+                stem_names=self.stem_names,
+                channels_per_stem=self.channels_per_stem,
+                sample_rate=self.sample_rate,
+                hop_length=self.hop_length,
+                target_num_frames=self.target_num_frames,
+                n_fft=self.n_fft,
+                sync_unit=repeat_ssm_sync_unit,
+                similarity_threshold=repeat_ssm_threshold,
+                min_diagonal_length_beats=repeat_ssm_min_length_beats,
+                near_diagonal_margin_beats=repeat_ssm_near_diagonal_margin_beats,
+                max_diagonal_length_beats=repeat_ssm_max_length_beats,
+                max_pairs=self.repeat_ssm_max_pairs,
+            )
+            if self.enable_repeat_pair_targets
+            else None
         )
 
         self.songs = songs
@@ -821,6 +849,39 @@ class BeatStemDataset(Dataset):
             waveform=waveform,
             valid_frames=valid_frames,
         )
+        if self.repeat_pair_builder is None:
+            repeat_pair_targets = {
+                "pair_indices": torch.zeros(
+                    (self.repeat_ssm_max_pairs, 2),
+                    dtype=torch.long,
+                    device=waveform.device,
+                ),
+                "pair_mask": torch.zeros(
+                    self.repeat_ssm_max_pairs,
+                    dtype=torch.float32,
+                    device=waveform.device,
+                ),
+            }
+        else:
+            built_repeat_pair_targets = self.repeat_pair_builder.build(
+                waveform=waveform,
+                beat_times=song.beat_times,
+                downbeat_times=song.downbeat_times,
+                meter_segments=tuple(
+                    (
+                        meter_annotation.start_sec,
+                        meter_annotation.end_sec,
+                        meter_annotation.meter_label,
+                    )
+                    for meter_annotation in song.meter_annotations
+                ),
+                start_sec=start_sec,
+                valid_frames=valid_frames,
+            )
+            repeat_pair_targets = {
+                "pair_indices": built_repeat_pair_targets.pair_indices,
+                "pair_mask": built_repeat_pair_targets.pair_mask,
+            }
 
         return {
             "waveform": waveform,
@@ -830,6 +891,8 @@ class BeatStemDataset(Dataset):
             "broadband_flux_targets": aux_targets.broadband_flux_targets,
             "onset_env_targets": aux_targets.onset_env_targets,
             "high_frequency_flux_targets": aux_targets.high_frequency_flux_targets,
+            "repeat_pair_indices": repeat_pair_targets["pair_indices"],
+            "repeat_pair_mask": repeat_pair_targets["pair_mask"],
             "valid_mask": valid_mask,
             "song_id": song.song_id,
             "semitone": semitone,

@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-15 03:34:16 UTC
+Generated: 2026-03-15 07:43:10 UTC
 
-Runs: 28
+Runs: 30
 
 ## Progress
 
@@ -10,36 +10,78 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 
 ![Downbeat Progress](experiment_progress_downbeat.svg)
 
-| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | stem_drop | init | model | branch |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
-| exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
-| exp_chord_preinit_stemdrop2_drumaux_basslowflux | complete | 17 | 0.4536 | 30 | 0.4387 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
-| exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
-| exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | - | - | - | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
-| exp_chord_preinit_stemdrop2_drumaux_bassaux | complete | 20 | 0.4442 | 30 | 0.4281 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
-| exp_chord_preinit_stemdrop2_drumaux_pianoaux | complete | 16 | 0.4440 | 30 | 0.4029 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/piano-broadband-flux-aux |
-| exp_chord_preinit_stemdrop2_phase | complete | 25 | 0.4409 | 30 | 0.4318 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/beat-phase-classification |
-| exp_chord_preinit_stemdrop2_drumaux_bassharmonic | complete | 12 | 0.4406 | 30 | 0.4150 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
-| exp_chord_preinit_stemdrop2_metertau0_5 | complete | 16 | 0.4401 | 30 | 0.4131 | 42 | 0.000300 | 8 | 0.050 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/meter-balancedsoftmax-tau0_5 |
-| exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/meter-classification |
-| exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 | complete | 23 | 0.3743 | 30 | 0.3569 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| exp_meter_classification_w0_0_5_specaug_f0_02_t0_05 | complete | 23 | 0.3705 | 30 | 0.3581 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| exp_meter_classification_w0_0_5_specaug_f0_05_t0_10 | complete | 25 | 0.3604 | 30 | 0.3439 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| exp_meter_classification_w0_0_5_beatpw10 | complete | 19 | 0.3599 | 30 | 0.3255 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/beat-pos-weight |
-| exp_meter_classification_w0_0_5_specaug_f0_00_t0_10 | complete | 24 | 0.3581 | 30 | 0.3552 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | - | - | - | - | L6/H64/O256 | exp/meter-classification |
-| exp_meter_classification_w0_0_5_specaug_f0_02_t0_00 | complete | 29 | 0.3504 | 30 | 0.3468 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| exp_meter_classification_w0_0_5_beatpw7_5 | complete | 16 | 0.3493 | 30 | 0.3248 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/beat-pos-weight |
-| exp_time_stretch_pm50 | complete | 22 | 0.3476 | 30 | 0.3372 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/time-stretch-augmentation |
-| exp_meter_numerator_w0_05 | complete | 28 | 0.3398 | 30 | 0.3379 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/meter-numerator-classification |
-| exp_meter_context_lowres_w0_05 | complete | 22 | 0.3382 | 30 | 0.3158 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/meter-context-lowres |
-| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
-| exp_meter_classification_w0_3 | complete | 24 | 0.3249 | 30 | 0.3174 | 42 | 0.000300 | 8 | 0.300 | - | - | - | - | L6/H64/O256 | exp/meter-classification |
-| exp_meter_downbeat_conditioning_w0_05 | complete | 18 | 0.3248 | 30 | 0.3090 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/meter-downbeat-conditioning |
-| exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
-| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
-| exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | repeat_w | stem_drop | init | model | branch |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm | complete | 23 | 0.4705 | 30 | 0.4444 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
+| exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar | complete | 21 | 0.4594 | 30 | 0.4370 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
+| exp_chord_preinit_stemdrop2_drumaux_basslowflux | complete | 17 | 0.4536 | 30 | 0.4387 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
+| exp_chord_preinit_stemdrop2 | complete | 18 | 0.4519 | 30 | 0.4275 | 42 | 0.000300 | 8 | 0.050 | - | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/stem-dropout-energy-ranking |
+| exp_chord_preinit_backbone | complete | 11 | 0.4471 | 30 | 0.3977 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | backbone:ema_state_dict | L6/H64/O256 | exp/chord-preinit-backbone |
+| exp_chord_preinit_stemdrop2_drumaux_bassaux | complete | 20 | 0.4442 | 30 | 0.4281 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
+| exp_chord_preinit_stemdrop2_drumaux_pianoaux | complete | 16 | 0.4440 | 30 | 0.4029 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/piano-broadband-flux-aux |
+| exp_chord_preinit_stemdrop2_phase | complete | 25 | 0.4409 | 30 | 0.4318 | 42 | 0.000300 | 8 | 0.050 | - | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/beat-phase-classification |
+| exp_chord_preinit_stemdrop2_drumaux_bassharmonic | complete | 12 | 0.4406 | 30 | 0.4150 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
+| exp_chord_preinit_stemdrop2_metertau0_5 | complete | 16 | 0.4401 | 30 | 0.4131 | 42 | 0.000300 | 8 | 0.050 | - | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/meter-balancedsoftmax-tau0_5 |
+| exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 | complete | 23 | 0.3743 | 30 | 0.3569 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_specaug_f0_02_t0_05 | complete | 23 | 0.3705 | 30 | 0.3581 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_specaug_f0_05_t0_10 | complete | 25 | 0.3604 | 30 | 0.3439 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_beatpw10 | complete | 19 | 0.3599 | 30 | 0.3255 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/beat-pos-weight |
+| exp_meter_classification_w0_0_5_specaug_f0_00_t0_10 | complete | 24 | 0.3581 | 30 | 0.3552 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_1 | complete | 24 | 0.3508 | 30 | 0.3388 | 42 | 0.000300 | 8 | 0.100 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_classification_w0_0_5_specaug_f0_02_t0_00 | complete | 29 | 0.3504 | 30 | 0.3468 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| exp_meter_classification_w0_0_5_beatpw7_5 | complete | 16 | 0.3493 | 30 | 0.3248 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/beat-pos-weight |
+| exp_time_stretch_pm50 | complete | 22 | 0.3476 | 30 | 0.3372 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/time-stretch-augmentation |
+| exp_meter_numerator_w0_05 | complete | 28 | 0.3398 | 30 | 0.3379 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/meter-numerator-classification |
+| exp_meter_context_lowres_w0_05 | complete | 22 | 0.3382 | 30 | 0.3158 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/meter-context-lowres |
+| exp_beat_plus_downbeat_logits | complete | 26 | 0.3371 | 30 | 0.3277 | 42 | 0.000300 | 8 | - | - | - | - | - | - | L6/H64/O256 | exp/beat-plus-downbeat-logits |
+| exp_meter_classification_w0_3 | complete | 24 | 0.3249 | 30 | 0.3174 | 42 | 0.000300 | 8 | 0.300 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_meter_downbeat_conditioning_w0_05 | complete | 18 | 0.3248 | 30 | 0.3090 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/meter-downbeat-conditioning |
+| exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
+| beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | - | - | - | L6/H64/O256 | - |
+| exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+
+## exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm |
+| status | complete |
+| best_epoch | 23 |
+| best_downbeat_f1 | 0.4705 |
+| best_beat_f1 | 0.6554 |
+| best_val_loss | 1.2617 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4444 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| repeat_consistency_loss_weight | 0.100 |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | 0.850 |
+| repeat_ssm_min_length_beats | 8 |
+| repeat_ssm_near_diagonal_margin_beats | 16 |
+| repeat_ssm_max_length_beats | 16 |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/repeat-ssm-downbeat-consistency |
+| git_commit | 2dc24e5d708fbff50b002dddfb08a16eb5dc2ee4 |
+| git_dirty | true |
 
 ## exp_chord_preinit_stemdrop2_drumaux_highfreq
 
@@ -62,6 +104,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -96,6 +144,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -107,6 +161,46 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | resume | - |
 | git_branch | exp/drum-aux-flux-onset |
 | git_commit | f9c10e4c96d429b7ff085d05e21029188377c398 |
+| git_dirty | true |
+
+## exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar |
+| status | complete |
+| best_epoch | 21 |
+| best_downbeat_f1 | 0.4594 |
+| best_beat_f1 | 0.6514 |
+| best_val_loss | 1.2455 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4370 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| repeat_consistency_loss_weight | 0.100 |
+| repeat_ssm_sync_unit | bar |
+| repeat_ssm_threshold | 0.850 |
+| repeat_ssm_min_length_beats | 2 |
+| repeat_ssm_near_diagonal_margin_beats | 2 |
+| repeat_ssm_max_length_beats | 4 |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/repeat-ssm-downbeat-consistency |
+| git_commit | 43c5ebc0956f6303f2f07fab809fdc97af1efa14 |
 | git_dirty | true |
 
 ## exp_chord_preinit_stemdrop2_drumaux_basslowflux
@@ -130,6 +224,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -164,6 +264,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -198,6 +304,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -232,6 +344,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -266,6 +384,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -300,6 +424,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | /mnt/f/Github/BeatTracker/model_epoch_200.pt |
@@ -334,6 +464,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -368,6 +504,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | 4 |
 | init_scope | backbone |
 | init_from | model_epoch_200.pt |
@@ -402,6 +544,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -436,6 +584,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -470,6 +624,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -504,6 +664,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -538,6 +704,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -572,6 +744,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -606,6 +784,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.100 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -640,6 +824,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -674,6 +864,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -708,6 +904,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -742,6 +944,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -776,6 +984,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -810,6 +1024,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -844,6 +1064,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.300 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -878,6 +1104,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -912,6 +1144,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -946,6 +1184,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
@@ -980,6 +1224,12 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
+| repeat_consistency_loss_weight | - |
+| repeat_ssm_sync_unit | - |
+| repeat_ssm_threshold | - |
+| repeat_ssm_min_length_beats | - |
+| repeat_ssm_near_diagonal_margin_beats | - |
+| repeat_ssm_max_length_beats | - |
 | stem_dropout_max_count | - |
 | init_scope | - |
 | init_from | - |
