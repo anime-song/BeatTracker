@@ -32,7 +32,10 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
-from training.augmentations import apply_ranked_stem_dropout
+from training.augmentations import (
+    apply_gpu_time_stretch_and_rebuild_targets,
+    apply_ranked_stem_dropout,
+)
 from training.losses import (
     BalancedSoftmaxLoss,
     ShiftTolerantBCELoss,
@@ -317,6 +320,18 @@ def parse_args() -> argparse.Namespace:
         help="1 サンプルあたりに保持する frame ペア数の上限。大きいほど loss には多く入るが、ノイズも増えやすい。",
     )
     parser.add_argument(
+        "--time-stretch-min-percent",
+        type=float,
+        default=-10.0,
+        help="train 時の duration 変化率の下限。-10 なら 0.9 倍に縮める。",
+    )
+    parser.add_argument(
+        "--time-stretch-max-percent",
+        type=float,
+        default=10.0,
+        help="train 時の duration 変化率の上限。10 なら 1.1 倍に伸ばす。",
+    )
+    parser.add_argument(
         "--stem-dropout-max-count",
         type=int,
         default=4,
@@ -445,16 +460,34 @@ def initialize_model_from_checkpoint(
     }
 
 
+def resolve_train_load_seconds(args: argparse.Namespace) -> float:
+    if args.time_stretch_min_percent > args.time_stretch_max_percent:
+        raise ValueError(
+            "time stretch min percent must be less than or equal to max percent"
+        )
+
+    min_duration_scale = 1.0 + (args.time_stretch_min_percent / 100.0)
+    max_duration_scale = 1.0 + (args.time_stretch_max_percent / 100.0)
+    if min_duration_scale <= 0.0 or max_duration_scale <= 0.0:
+        raise ValueError("time stretch percent must be greater than -100")
+
+    if min_duration_scale >= 1.0:
+        return float(args.segment_seconds)
+    return float(args.segment_seconds) / min_duration_scale
+
+
 def build_dataloaders(
     args: argparse.Namespace,
 ) -> tuple[BeatStemDataset, DataLoader, DataLoader]:
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
 
+    train_load_seconds = resolve_train_load_seconds(args)
     train_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
         split="train",
         segment_seconds=args.segment_seconds,
+        load_seconds=train_load_seconds,
         sample_rate=args.sample_rate,
         hop_length=args.hop_length,
         n_fft=args.n_fft,
@@ -471,6 +504,8 @@ def build_dataloaders(
         repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
         repeat_ssm_max_length_beats=args.repeat_ssm_max_length_beats,
         repeat_ssm_max_pairs=args.repeat_ssm_max_pairs,
+        time_stretch_min_percent=args.time_stretch_min_percent,
+        time_stretch_max_percent=args.time_stretch_max_percent,
     )
     val_base_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
@@ -492,6 +527,8 @@ def build_dataloaders(
         repeat_ssm_near_diagonal_margin_beats=args.repeat_ssm_near_diagonal_margin_beats,
         repeat_ssm_max_length_beats=args.repeat_ssm_max_length_beats,
         repeat_ssm_max_pairs=args.repeat_ssm_max_pairs,
+        time_stretch_min_percent=0.0,
+        time_stretch_max_percent=0.0,
     )
     val_dataset = ValidationSegmentDataset(val_base_dataset, semitone=None)
 
@@ -944,6 +981,15 @@ def train_one_epoch(
     repeat_consistency_loss_weight: float,
     num_stems: int,
     stem_dropout_max_count: int,
+    time_stretch_min_percent: float,
+    time_stretch_max_percent: float,
+    time_stretch_target_samples: int,
+    time_stretch_target_num_frames: int,
+    meter_ignore_index: int,
+    aux_target_builder,
+    repeat_pair_builder,
+    n_fft: int,
+    hop_length: int,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -963,9 +1009,32 @@ def train_one_epoch(
 
     for batch_index, batch in enumerate(progress, start=1):
         batch = move_batch_to_device(batch, device)
+        if time_stretch_min_percent != 0.0 or time_stretch_max_percent != 0.0:
+            batch = apply_gpu_time_stretch_and_rebuild_targets(
+                batch=batch,
+                min_percent=time_stretch_min_percent,
+                max_percent=time_stretch_max_percent,
+                n_fft=n_fft,
+                hop_length=hop_length,
+                target_samples=time_stretch_target_samples,
+                target_num_frames=time_stretch_target_num_frames,
+                meter_ignore_index=meter_ignore_index,
+                aux_target_builder=aux_target_builder,
+                repeat_pair_builder=repeat_pair_builder,
+                drum_aux_loss_weight=drum_aux_loss_weight,
+            )
         optimizer.zero_grad(set_to_none=True)
 
         dropped_stem_count = 0.0
+        mean_time_stretch_percent = 0.0
+        mean_time_stretch_scale = 1.0
+        if "time_stretch_percent" in batch:
+            mean_time_stretch_percent = float(
+                batch["time_stretch_percent"].mean().item()
+            )
+            mean_time_stretch_scale = float(
+                batch["time_stretch_duration_scale"].mean().item()
+            )
         if stem_dropout_max_count > 0:
             batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
                 batch["waveform"],
@@ -992,6 +1061,8 @@ def train_one_epoch(
                 repeat_consistency_loss_weight,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
+            loss_info["time_stretch_percent"] = mean_time_stretch_percent
+            loss_info["time_stretch_duration_scale"] = mean_time_stretch_scale
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -1085,6 +1156,16 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/time_stretch_percent",
+                loss_info["time_stretch_percent"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/time_stretch_duration_scale",
+                loss_info["time_stretch_duration_scale"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/lr", optimizer.param_groups[0]["lr"], global_step
             )
 
@@ -1096,6 +1177,7 @@ def train_one_epoch(
                 meter=f"{loss_info['meter_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
                 repeat=f"{loss_info['repeat_consistency_loss']:.4f}",
+                stretch=f"{loss_info['time_stretch_percent']:+.1f}%",
             )
 
     return tracker.averages(), global_step
@@ -1326,6 +1408,8 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "raw_repeat_consistency_loss",
         "repeat_pair_count",
         "stem_dropout_count",
+        "time_stretch_percent",
+        "time_stretch_duration_scale",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1358,6 +1442,7 @@ def main() -> None:
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
     train_dataset, train_loader, val_loader = build_dataloaders(args)
+    train_load_seconds = resolve_train_load_seconds(args)
     model = build_model(args, train_dataset).to(device)
     init_info: Optional[dict[str, object]] = None
     if args.init_from is not None:
@@ -1424,6 +1509,9 @@ def main() -> None:
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
             "drum_aux_use_high_frequency_flux": args.drum_aux_use_high_frequency_flux,
             "repeat_consistency_loss_weight": args.repeat_consistency_loss_weight,
+            "time_stretch_min_percent": args.time_stretch_min_percent,
+            "time_stretch_max_percent": args.time_stretch_max_percent,
+            "train_load_seconds": train_load_seconds,
             "init_state_source": None
             if init_info is None
             else init_info["state_source"],
@@ -1453,6 +1541,12 @@ def main() -> None:
         "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
     )
     print(f"repeat_consistency_loss_weight={args.repeat_consistency_loss_weight}")
+    print(
+        "time_stretch="
+        f"min_percent={args.time_stretch_min_percent}, "
+        f"max_percent={args.time_stretch_max_percent}, "
+        f"train_load_seconds={train_load_seconds:.2f}"
+    )
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
@@ -1503,6 +1597,15 @@ def main() -> None:
                 repeat_consistency_loss_weight=args.repeat_consistency_loss_weight,
                 num_stems=len(train_dataset.stem_names),
                 stem_dropout_max_count=args.stem_dropout_max_count,
+                time_stretch_min_percent=args.time_stretch_min_percent,
+                time_stretch_max_percent=args.time_stretch_max_percent,
+                time_stretch_target_samples=train_dataset.segment_samples,
+                time_stretch_target_num_frames=train_dataset.target_num_frames,
+                meter_ignore_index=train_dataset.meter_ignore_index,
+                aux_target_builder=train_dataset.aux_target_builder,
+                repeat_pair_builder=train_dataset.repeat_pair_builder,
+                n_fft=args.n_fft,
+                hop_length=args.hop_length,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,

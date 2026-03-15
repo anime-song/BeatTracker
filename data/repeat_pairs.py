@@ -125,6 +125,23 @@ class RepeatPairBuilder:
         )
         return targets
 
+    def build_from_frame_targets(
+        self,
+        waveform: torch.Tensor,
+        beat_targets: torch.Tensor,
+        downbeat_targets: torch.Tensor,
+        meter_targets: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> RepeatPairTargets:
+        targets, _ = self.analyze_from_frame_targets(
+            waveform=waveform,
+            beat_targets=beat_targets,
+            downbeat_targets=downbeat_targets,
+            meter_targets=meter_targets,
+            valid_mask=valid_mask,
+        )
+        return targets
+
     def analyze(
         self,
         waveform: torch.Tensor,
@@ -181,6 +198,95 @@ class RepeatPairBuilder:
                 sync_labels=sync_labels,
                 sync_features=sync_features,
                 similarity_matrix=torch.empty((0, 0), dtype=waveform.dtype, device=waveform.device),
+                runs=tuple(),
+                targets=empty,
+            )
+
+        similarity = self._compute_self_similarity(
+            sync_features=sync_features,
+            sync_labels=sync_labels,
+        )
+        runs = self._find_diagonal_runs(similarity)
+        selected_runs = self._select_non_overlapping_runs(runs)
+        targets = self._build_pair_targets(
+            runs=selected_runs,
+            sync_start_frames=sync_start_frames,
+            device=waveform.device,
+        )
+        debug_info = RepeatPairDebugInfo(
+            sync_unit=self.sync_unit,
+            valid_frames=available_frames,
+            sync_frame_indices=sync_frame_indices,
+            sync_start_frames=sync_start_frames,
+            sync_labels=sync_labels,
+            sync_features=sync_features,
+            similarity_matrix=similarity,
+            runs=tuple(
+                RepeatPairRun(
+                    start_index_a=run.start_a,
+                    start_index_b=run.start_b,
+                    length_units=run.length,
+                    mean_similarity=run.mean_similarity,
+                )
+                for run in selected_runs
+            ),
+            targets=targets,
+        )
+        return targets, debug_info
+
+    def analyze_from_frame_targets(
+        self,
+        waveform: torch.Tensor,
+        beat_targets: torch.Tensor,
+        downbeat_targets: torch.Tensor,
+        meter_targets: torch.Tensor,
+        valid_mask: torch.Tensor,
+    ) -> tuple[RepeatPairTargets, RepeatPairDebugInfo]:
+        valid_frames = int(valid_mask.sum().item())
+        empty = self.empty(waveform.device)
+        empty_debug = self._empty_debug_info(
+            device=waveform.device, valid_frames=valid_frames
+        )
+        if valid_frames <= 1:
+            return empty, empty_debug
+
+        event_targets = beat_targets if self.sync_unit == "beat" else downbeat_targets
+        sync_frame_indices = torch.nonzero(
+            event_targets[:valid_frames] > 0.5,
+            as_tuple=False,
+        ).flatten()
+        if sync_frame_indices.numel() < self.min_diagonal_length_beats + 1:
+            return empty, empty_debug
+
+        repeat_waveform = self._extract_repeat_waveform(waveform)
+        chroma = self._compute_chroma(repeat_waveform)
+        available_frames = min(valid_frames, int(chroma.shape[-1]))
+        if available_frames <= 1:
+            return empty, empty_debug
+
+        sync_frame_indices = sync_frame_indices[sync_frame_indices < available_frames]
+        if sync_frame_indices.numel() < self.min_diagonal_length_beats + 1:
+            return empty, empty_debug
+
+        sync_features, sync_start_frames = self._compute_sync_chroma(
+            chroma=chroma[:, :available_frames],
+            sync_frame_indices=sync_frame_indices,
+        )
+        sync_labels = self._compute_sync_labels_from_meter_targets(
+            sync_frame_indices=sync_frame_indices,
+            meter_targets=meter_targets,
+        )
+        if sync_features.shape[0] < self.min_diagonal_length_beats:
+            return empty, RepeatPairDebugInfo(
+                sync_unit=self.sync_unit,
+                valid_frames=available_frames,
+                sync_frame_indices=sync_frame_indices,
+                sync_start_frames=sync_start_frames,
+                sync_labels=sync_labels,
+                sync_features=sync_features,
+                similarity_matrix=torch.empty(
+                    (0, 0), dtype=waveform.dtype, device=waveform.device
+                ),
                 runs=tuple(),
                 targets=empty,
             )
@@ -368,6 +474,23 @@ class RepeatPairBuilder:
                     label = segment_label
                     break
             labels.append(label)
+        return tuple(labels)
+
+    def _compute_sync_labels_from_meter_targets(
+        self,
+        sync_frame_indices: torch.Tensor,
+        meter_targets: torch.Tensor,
+    ) -> tuple[str, ...]:
+        sync_count = max(0, int(sync_frame_indices.numel()) - 1)
+        if sync_count == 0:
+            return tuple()
+        if self.sync_unit != "bar":
+            return tuple("" for _ in range(sync_count))
+
+        labels: list[str] = []
+        for start_frame in sync_frame_indices[:-1].tolist():
+            meter_label = int(meter_targets[start_frame].item())
+            labels.append("" if meter_label < 0 else str(meter_label))
         return tuple(labels)
 
     def _compute_self_similarity(

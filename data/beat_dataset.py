@@ -16,7 +16,7 @@ import torchaudio
 import torchaudio.functional as AF
 from torch.utils.data import Dataset
 
-from .aux_targets import StemAuxTargetBuilder
+from .aux_targets import StemAuxTargetBuilder, StemAuxTargets
 from .repeat_pairs import RepeatPairBuilder
 
 
@@ -274,6 +274,7 @@ class BeatStemDataset(Dataset):
         dataset_root: str | Path = "dataset/meter_dataset",
         split: Optional[str] = "train",
         segment_seconds: float = 8.0,
+        load_seconds: Optional[float] = None,
         sample_rate: Optional[int] = None,
         hop_length: int = 512,
         n_fft: int = 2048,
@@ -292,6 +293,8 @@ class BeatStemDataset(Dataset):
         repeat_ssm_near_diagonal_margin_beats: int = 16,
         repeat_ssm_max_length_beats: int = 16,
         repeat_ssm_max_pairs: int = 128,
+        time_stretch_min_percent: float = 0.0,
+        time_stretch_max_percent: float = 0.0,
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
     ) -> None:
@@ -306,7 +309,11 @@ class BeatStemDataset(Dataset):
         self.split_path = self.dataset_root / "single.split"
 
         self.split = split
-        self.segment_seconds = float(segment_seconds)
+        self.requested_segment_seconds = float(segment_seconds)
+        self.segment_seconds = self.requested_segment_seconds
+        self.load_seconds = (
+            float(load_seconds) if load_seconds is not None else self.segment_seconds
+        )
         self.hop_length = int(hop_length)
         self.n_fft = int(n_fft)
         self.stem_names = tuple(stem_names)
@@ -317,6 +324,8 @@ class BeatStemDataset(Dataset):
         self.meter_ignore_index = -100
         self.enable_repeat_pair_targets = bool(enable_repeat_pair_targets)
         self.repeat_ssm_max_pairs = int(repeat_ssm_max_pairs)
+        self.time_stretch_min_percent = float(time_stretch_min_percent)
+        self.time_stretch_max_percent = float(time_stretch_max_percent)
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
@@ -324,6 +333,8 @@ class BeatStemDataset(Dataset):
 
         if self.segment_seconds <= 0:
             raise ValueError("segment_seconds must be positive")
+        if self.load_seconds <= 0:
+            raise ValueError("load_seconds must be positive")
         if self.hop_length <= 0:
             raise ValueError("hop_length must be positive")
         if self.n_fft <= 0:
@@ -474,10 +485,16 @@ class BeatStemDataset(Dataset):
         self.num_audio_channels = len(self.stem_names) * self.channels_per_stem
 
         self.segment_samples = int(round(self.segment_seconds * self.sample_rate))
+        self.load_segment_samples = int(round(self.load_seconds * self.sample_rate))
         if self.segment_samples < self.n_fft:
             raise ValueError("segment_seconds is too short for the configured n_fft")
+        if self.load_segment_samples < self.n_fft:
+            raise ValueError("load_seconds is too short for the configured n_fft")
         # モデル側の crop_length と一致するよう、center=True の STFT/CQT を前提にした長さで持つ。
         self.target_num_frames = 1 + ((self.segment_samples - self.n_fft) // self.hop_length)
+        self.load_target_num_frames = 1 + (
+            (self.load_segment_samples - self.n_fft) // self.hop_length
+        )
         # 補助ターゲット生成は別クラスに切り出して、dataset 本体を薄く保つ。
         self.aux_target_builder = StemAuxTargetBuilder(
             stem_names=self.stem_names,
@@ -621,7 +638,7 @@ class BeatStemDataset(Dataset):
     ) -> tuple[torch.Tensor, int]:
         source_sample_rate = song.sample_rate
         frame_offset = int(round(start_sec * source_sample_rate))
-        num_frames = int(math.ceil(self.segment_seconds * source_sample_rate))
+        num_frames = int(math.ceil(self.load_seconds * source_sample_rate))
 
         if self.use_file_handle_cache:
             # 同じ worker が同じ stem を何度も読むので、open/close を避ける。
@@ -651,11 +668,14 @@ class BeatStemDataset(Dataset):
             waveform = AF.resample(waveform, orig_freq=loaded_sample_rate, new_freq=self.sample_rate)
 
         # 終端付近で短く読まれた場合はゼロ埋めし、valid_samples で実データ範囲だけ管理する。
-        valid_samples = min(waveform.shape[-1], self.segment_samples)
-        if waveform.shape[-1] < self.segment_samples:
-            waveform = F.pad(waveform, (0, self.segment_samples - waveform.shape[-1]))
+        valid_samples = min(waveform.shape[-1], self.load_segment_samples)
+        if waveform.shape[-1] < self.load_segment_samples:
+            waveform = F.pad(
+                waveform,
+                (0, self.load_segment_samples - waveform.shape[-1]),
+            )
         else:
-            waveform = waveform[..., : self.segment_samples]
+            waveform = waveform[..., : self.load_segment_samples]
 
         return waveform.contiguous(), valid_samples
 
@@ -668,7 +688,7 @@ class BeatStemDataset(Dataset):
         packed_entry = song.packed_variants[semitone]
         source_sample_rate = packed_entry.sample_rate
         frame_offset = int(round(start_sec * source_sample_rate))
-        num_frames = int(math.ceil(self.segment_seconds * source_sample_rate))
+        num_frames = int(math.ceil(self.load_seconds * source_sample_rate))
         frame_end = min(frame_offset + num_frames, packed_entry.num_frames)
 
         if self.use_file_handle_cache:
@@ -699,11 +719,14 @@ class BeatStemDataset(Dataset):
         if source_sample_rate != self.sample_rate:
             waveform = AF.resample(waveform, orig_freq=source_sample_rate, new_freq=self.sample_rate)
 
-        valid_samples = min(waveform.shape[-1], self.segment_samples)
-        if waveform.shape[-1] < self.segment_samples:
-            waveform = F.pad(waveform, (0, self.segment_samples - waveform.shape[-1]))
+        valid_samples = min(waveform.shape[-1], self.load_segment_samples)
+        if waveform.shape[-1] < self.load_segment_samples:
+            waveform = F.pad(
+                waveform,
+                (0, self.load_segment_samples - waveform.shape[-1]),
+            )
         else:
-            waveform = waveform[..., : self.segment_samples]
+            waveform = waveform[..., : self.load_segment_samples]
 
         return waveform.contiguous(), valid_samples
 
@@ -712,12 +735,19 @@ class BeatStemDataset(Dataset):
         event_times: torch.Tensor,
         start_sec: float,
         valid_frames: int,
+        target_num_frames: Optional[int] = None,
+        segment_duration_sec: Optional[float] = None,
     ) -> torch.Tensor:
-        targets = torch.zeros(self.target_num_frames, dtype=torch.float32)
+        if target_num_frames is None:
+            target_num_frames = self.target_num_frames
+        if segment_duration_sec is None:
+            segment_duration_sec = self.segment_seconds
+
+        targets = torch.zeros(target_num_frames, dtype=torch.float32)
         if valid_frames <= 0 or event_times.numel() == 0:
             return targets
 
-        end_sec = start_sec + self.segment_seconds
+        end_sec = start_sec + segment_duration_sec
         # この crop に入るイベントだけを取り出す。
         within_crop = (event_times >= start_sec) & (event_times < end_sec)
         if not torch.any(within_crop):
@@ -829,27 +859,54 @@ class BeatStemDataset(Dataset):
             # [stem, channel, time] ではなく、既存モデルに合わせて channel 次元へ連結する。
             waveform = torch.cat(stem_waveforms, dim=0)
 
-        valid_frames = 0
+        meter_segments = tuple(
+            (
+                meter_annotation.start_sec,
+                meter_annotation.end_sec,
+                meter_annotation.meter_label,
+            )
+            for meter_annotation in song.meter_annotations
+        )
+
+        loaded_valid_frames = 0
         if valid_samples >= self.n_fft:
-            valid_frames = min(self.target_num_frames, 1 + ((valid_samples - self.n_fft) // self.hop_length))
+            loaded_valid_frames = min(
+                self.load_target_num_frames,
+                1 + ((valid_samples - self.n_fft) // self.hop_length),
+            )
 
-        # ゼロ埋め領域や、STFT 窓が成立しない末尾フレームを loss から外すためのマスク。
-        valid_mask = torch.zeros(self.target_num_frames, dtype=torch.float32)
-        valid_mask[:valid_frames] = 1.0
-
-        beat_targets = self._events_to_frame_targets(song.beat_times, start_sec, valid_frames)
-        downbeat_targets = self._events_to_frame_targets(song.downbeat_times, start_sec, valid_frames)
-        meter_targets = self._meter_annotations_to_frame_targets(
-            song=song,
-            start_sec=start_sec,
-            target_num_frames=self.target_num_frames,
-            valid_frames=valid_frames,
+        time_stretch_enabled = (
+            self.time_stretch_min_percent != 0.0
+            or self.time_stretch_max_percent != 0.0
         )
-        aux_targets = self.aux_target_builder.build(
-            waveform=waveform,
-            valid_frames=valid_frames,
-        )
-        if self.repeat_pair_builder is None:
+        if time_stretch_enabled:
+            # GPU 側で time stretch するため、dataset では長めに読んだ波形と
+            # それに対応する元ラベルだけを返す。重い aux / repeat 生成はここでは行わない。
+            beat_targets = self._events_to_frame_targets(
+                song.beat_times,
+                start_sec,
+                loaded_valid_frames,
+                target_num_frames=self.load_target_num_frames,
+                segment_duration_sec=self.load_seconds,
+            )
+            downbeat_targets = self._events_to_frame_targets(
+                song.downbeat_times,
+                start_sec,
+                loaded_valid_frames,
+                target_num_frames=self.load_target_num_frames,
+                segment_duration_sec=self.load_seconds,
+            )
+            meter_targets = self._meter_annotations_to_frame_targets(
+                song=song,
+                start_sec=start_sec,
+                target_num_frames=self.load_target_num_frames,
+                valid_frames=loaded_valid_frames,
+            )
+            valid_mask = torch.zeros(
+                self.load_target_num_frames,
+                dtype=torch.float32,
+            )
+            valid_mask[:loaded_valid_frames] = 1.0
             repeat_pair_targets = {
                 "pair_indices": torch.zeros(
                     (self.repeat_ssm_max_pairs, 2),
@@ -862,26 +919,83 @@ class BeatStemDataset(Dataset):
                     device=waveform.device,
                 ),
             }
-        else:
-            built_repeat_pair_targets = self.repeat_pair_builder.build(
-                waveform=waveform,
-                beat_times=song.beat_times,
-                downbeat_times=song.downbeat_times,
-                meter_segments=tuple(
-                    (
-                        meter_annotation.start_sec,
-                        meter_annotation.end_sec,
-                        meter_annotation.meter_label,
-                    )
-                    for meter_annotation in song.meter_annotations
+            aux_targets = StemAuxTargets(
+                broadband_flux_targets=torch.zeros(
+                    self.target_num_frames,
+                    dtype=torch.float32,
+                    device=waveform.device,
                 ),
+                onset_env_targets=torch.zeros(
+                    self.target_num_frames,
+                    dtype=torch.float32,
+                    device=waveform.device,
+                ),
+                high_frequency_flux_targets=torch.zeros(
+                    self.target_num_frames,
+                    dtype=torch.float32,
+                    device=waveform.device,
+                ),
+            )
+        else:
+            valid_samples = min(valid_samples, self.segment_samples)
+            waveform = waveform[..., : self.segment_samples]
+            valid_frames = 0
+            if valid_samples >= self.n_fft:
+                valid_frames = min(
+                    self.target_num_frames,
+                    1 + ((valid_samples - self.n_fft) // self.hop_length),
+                )
+
+            # ゼロ埋め領域や、STFT 窓が成立しない末尾フレームを loss から外すためのマスク。
+            valid_mask = torch.zeros(self.target_num_frames, dtype=torch.float32)
+            valid_mask[:valid_frames] = 1.0
+            beat_targets = self._events_to_frame_targets(
+                song.beat_times,
+                start_sec,
+                valid_frames,
+            )
+            downbeat_targets = self._events_to_frame_targets(
+                song.downbeat_times,
+                start_sec,
+                valid_frames,
+            )
+            meter_targets = self._meter_annotations_to_frame_targets(
+                song=song,
                 start_sec=start_sec,
+                target_num_frames=self.target_num_frames,
                 valid_frames=valid_frames,
             )
-            repeat_pair_targets = {
-                "pair_indices": built_repeat_pair_targets.pair_indices,
-                "pair_mask": built_repeat_pair_targets.pair_mask,
-            }
+            if self.repeat_pair_builder is None:
+                repeat_pair_targets = {
+                    "pair_indices": torch.zeros(
+                        (self.repeat_ssm_max_pairs, 2),
+                        dtype=torch.long,
+                        device=waveform.device,
+                    ),
+                    "pair_mask": torch.zeros(
+                        self.repeat_ssm_max_pairs,
+                        dtype=torch.float32,
+                        device=waveform.device,
+                    ),
+                }
+            else:
+                built_repeat_pair_targets = self.repeat_pair_builder.build(
+                    waveform=waveform,
+                    beat_times=song.beat_times,
+                    downbeat_times=song.downbeat_times,
+                    meter_segments=meter_segments,
+                    start_sec=start_sec,
+                    valid_frames=valid_frames,
+                )
+                repeat_pair_targets = {
+                    "pair_indices": built_repeat_pair_targets.pair_indices,
+                    "pair_mask": built_repeat_pair_targets.pair_mask,
+                }
+
+            aux_targets = self.aux_target_builder.build(
+                waveform=waveform,
+                valid_frames=valid_frames,
+            )
 
         return {
             "waveform": waveform,
@@ -911,6 +1025,6 @@ class BeatStemDataset(Dataset):
             semitone_index = int(torch.randint(len(song.available_semitones), size=(1,)).item())
             semitone = song.available_semitones[semitone_index]
 
-        max_start_sec = max(song.effective_duration_sec - self.segment_seconds, 0.0)
+        max_start_sec = max(song.effective_duration_sec - self.load_seconds, 0.0)
         start_sec = 0.0 if max_start_sec <= 0 else float(torch.rand(1).item() * max_start_sec)
         return self.make_sample(song, start_sec=start_sec, semitone=semitone)

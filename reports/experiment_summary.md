@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-15 07:43:10 UTC
+Generated: 2026-03-15 10:28:34 UTC
 
-Runs: 30
+Runs: 31
 
 ## Progress
 
@@ -25,6 +25,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | exp_chord_preinit_stemdrop2_drumaux_bassharmonic | complete | 12 | 0.4406 | 30 | 0.4150 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/bass-aux-lowflux-harmonic-change |
 | exp_chord_preinit_stemdrop2_metertau0_5 | complete | 16 | 0.4401 | 30 | 0.4131 | 42 | 0.000300 | 8 | 0.050 | - | - | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/meter-balancedsoftmax-tau0_5 |
 | exp_meter_classification_w0_0_5 | complete | 20 | 0.3903 | 30 | 0.3534 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_timestretch_pm10 | complete | 30 | 0.3784 | 30 | 0.3784 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 0.100 | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/tempo-augmentation-pm10 |
 | exp_meter_classification_w0_0_5_specaug_f0_00_t0_05 | complete | 23 | 0.3743 | 30 | 0.3569 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
 | exp_meter_classification_w0_0_5_specaug_f0_02_t0_05 | complete | 23 | 0.3705 | 30 | 0.3581 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
 | exp_meter_classification_w0_0_5_specaug_f0_05_t0_10 | complete | 25 | 0.3604 | 30 | 0.3439 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
@@ -61,6 +62,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
@@ -101,6 +104,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
@@ -141,6 +146,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
@@ -181,6 +188,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | true |
@@ -221,6 +230,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
@@ -261,6 +272,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -301,6 +314,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -341,6 +356,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
@@ -381,6 +398,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
@@ -421,6 +440,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -461,6 +482,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | 0.100 |
 | drum_aux_use_high_frequency_flux | - |
@@ -501,6 +524,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -541,6 +566,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -563,6 +590,48 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | git_commit | 8af5e0224aad55ca3e419c04bc182d2e86acb6b0 |
 | git_dirty | true |
 
+## exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_timestretch_pm10
+
+| field | value |
+| --- | --- |
+| path | outputs/exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_timestretch_pm10 |
+| status | complete |
+| best_epoch | 30 |
+| best_downbeat_f1 | 0.3784 |
+| best_beat_f1 | 0.6596 |
+| best_val_loss | 1.3199 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.3784 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| time_stretch_min_percent | -10.0 |
+| time_stretch_max_percent | 10.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| repeat_consistency_loss_weight | 0.100 |
+| repeat_ssm_sync_unit | beat |
+| repeat_ssm_threshold | 0.850 |
+| repeat_ssm_min_length_beats | 8 |
+| repeat_ssm_near_diagonal_margin_beats | 16 |
+| repeat_ssm_max_length_beats | 16 |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/tempo-augmentation-pm10 |
+| git_commit | fa7462cfb77f811ce79e869947948c85cbf6d0ce |
+| git_dirty | true |
+
 ## exp_meter_classification_w0_0_5_specaug_f0_00_t0_05
 
 | field | value |
@@ -581,6 +650,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -621,6 +692,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -661,6 +734,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -701,6 +776,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -741,6 +818,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -781,6 +860,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.100 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -821,6 +902,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -861,6 +944,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -901,6 +986,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | -50.0 |
+| time_stretch_max_percent | 50.0 |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -941,6 +1028,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -981,6 +1070,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1021,6 +1112,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1061,6 +1154,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.300 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1101,6 +1196,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1141,6 +1238,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | 0.050 |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1181,6 +1280,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |
@@ -1221,6 +1322,8 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | batch_size | 8 |
 | train_samples_per_epoch | 1024 |
 | segment_seconds | 30.0 |
+| time_stretch_min_percent | - |
+| time_stretch_max_percent | - |
 | meter_loss_weight | - |
 | drum_aux_loss_weight | - |
 | drum_aux_use_high_frequency_flux | - |

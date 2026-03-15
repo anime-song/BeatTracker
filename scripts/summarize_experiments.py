@@ -28,6 +28,8 @@ class ExperimentSummary:
     batch_size: Optional[int]
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
+    time_stretch_min_percent: Optional[float]
+    time_stretch_max_percent: Optional[float]
     meter_loss_weight: Optional[float]
     drum_aux_loss_weight: Optional[float]
     drum_aux_use_high_frequency_flux: Optional[bool]
@@ -80,6 +82,12 @@ class ExperimentSummary:
             "batch_size": _format_int(self.batch_size),
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
+            "time_stretch_min_percent": _format_float(
+                self.time_stretch_min_percent, digits=1
+            ),
+            "time_stretch_max_percent": _format_float(
+                self.time_stretch_max_percent, digits=1
+            ),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
             "drum_aux_loss_weight": _format_float(
                 self.drum_aux_loss_weight, digits=3
@@ -282,6 +290,8 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         batch_size=_as_int(config.get("batch_size")),
         train_samples_per_epoch=_as_int(config.get("train_samples_per_epoch")),
         segment_seconds=_as_float(config.get("segment_seconds")),
+        time_stretch_min_percent=_as_float(config.get("time_stretch_min_percent")),
+        time_stretch_max_percent=_as_float(config.get("time_stretch_max_percent")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
         drum_aux_loss_weight=_as_float(config.get("drum_aux_loss_weight")),
         drum_aux_use_high_frequency_flux=_as_bool(
@@ -362,6 +372,8 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "batch_size",
         "train_samples_per_epoch",
         "segment_seconds",
+        "time_stretch_min_percent",
+        "time_stretch_max_percent",
         "meter_loss_weight",
         "drum_aux_loss_weight",
         "drum_aux_use_high_frequency_flux",
@@ -663,6 +675,16 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         [
                             "segment_seconds",
                             _format_float(summary.segment_seconds, digits=1) or "-",
+                        ],
+                        [
+                            "time_stretch_min_percent",
+                            _format_float(summary.time_stretch_min_percent, digits=1)
+                            or "-",
+                        ],
+                        [
+                            "time_stretch_max_percent",
+                            _format_float(summary.time_stretch_max_percent, digits=1)
+                            or "-",
                         ],
                         [
                             "meter_loss_weight",
