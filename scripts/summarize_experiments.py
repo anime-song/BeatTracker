@@ -81,9 +81,7 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
-            "drum_aux_loss_weight": _format_float(
-                self.drum_aux_loss_weight, digits=3
-            ),
+            "drum_aux_loss_weight": _format_float(self.drum_aux_loss_weight, digits=3),
             "drum_aux_use_high_frequency_flux": ""
             if self.drum_aux_use_high_frequency_flux is None
             else str(self.drum_aux_use_high_frequency_flux).lower(),
@@ -91,9 +89,7 @@ class ExperimentSummary:
                 self.repeat_consistency_loss_weight, digits=3
             ),
             "repeat_ssm_sync_unit": self.repeat_ssm_sync_unit or "",
-            "repeat_ssm_threshold": _format_float(
-                self.repeat_ssm_threshold, digits=3
-            ),
+            "repeat_ssm_threshold": _format_float(self.repeat_ssm_threshold, digits=3),
             "repeat_ssm_min_length_beats": _format_int(
                 self.repeat_ssm_min_length_beats
             ),
@@ -292,22 +288,20 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         ),
         repeat_ssm_sync_unit=_as_str(config.get("repeat_ssm_sync_unit")),
         repeat_ssm_threshold=_as_float(config.get("repeat_ssm_threshold")),
-        repeat_ssm_min_length_beats=_as_int(
-            config.get("repeat_ssm_min_length_beats")
-        ),
+        repeat_ssm_min_length_beats=_as_int(config.get("repeat_ssm_min_length_beats")),
         repeat_ssm_near_diagonal_margin_beats=_as_int(
             config.get("repeat_ssm_near_diagonal_margin_beats")
         ),
-        repeat_ssm_max_length_beats=_as_int(
-            config.get("repeat_ssm_max_length_beats")
-        ),
+        repeat_ssm_max_length_beats=_as_int(config.get("repeat_ssm_max_length_beats")),
         stem_dropout_max_count=_as_int(config.get("stem_dropout_max_count")),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
         init_state_source=str(config["init_state_source"])
         if config.get("init_state_source")
         else None,
-        audio_backend=str(config["audio_backend"]) if "audio_backend" in config else None,
+        audio_backend=str(config["audio_backend"])
+        if "audio_backend" in config
+        else None,
         scheduler=str(config["scheduler"]) if "scheduler" in config else None,
         ema_decay=_as_float(config.get("ema_decay")),
         num_layers=_as_int(config.get("num_layers")),
@@ -478,7 +472,7 @@ def _write_progress_svg(svg_path: Path, summaries: list[ExperimentSummary]) -> N
         bars.append(
             "\n".join(
                 [
-                    f'<g>',
+                    f"<g>",
                     f'<title>{html.escape(summary.run_name)}&#10;best_downbeat_f1={score:.4f}'
                     f'&#10;completed_at~{html.escape(_format_timestamp(summary.completed_timestamp) or "-")}</title>',
                     f'<rect x="{x - 12:.1f}" y="{bar_top:.1f}" width="24" height="{bar_height:.1f}" '
@@ -724,7 +718,9 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         ["git_commit", summary.git_commit or "-"],
                         [
                             "git_dirty",
-                            "-" if summary.git_dirty is None else str(summary.git_dirty).lower(),
+                            "-"
+                            if summary.git_dirty is None
+                            else str(summary.git_dirty).lower(),
                         ],
                     ],
                 ),
@@ -740,7 +736,9 @@ def main() -> None:
     summaries = collect_summaries(args.outputs_root)
     write_csv(args.csv_path, summaries)
     write_markdown(args.markdown_path, summaries)
-    _write_progress_svg(args.markdown_path.with_name("experiment_progress_downbeat.svg"), summaries)
+    _write_progress_svg(
+        args.markdown_path.with_name("experiment_progress_downbeat.svg"), summaries
+    )
 
     print(f"runs={len(summaries)}")
     print(f"csv={args.csv_path}")

@@ -36,7 +36,9 @@ class OctaveSharedAggregate(nn.Module):
         return_weights: bool = False,
     ):
         super().__init__()
-        assert f_total % bins_per_octave == 0, "F_total must be divisible by bins_per_octave"
+        assert (
+            f_total % bins_per_octave == 0
+        ), "F_total must be divisible by bins_per_octave"
         self.in_channels = in_channels
         self.f_total = f_total
         self.hidden = hidden_size
@@ -58,7 +60,9 @@ class OctaveSharedAggregate(nn.Module):
 
         # Shared conv applied per octave: (B*O, C, T, bins) -> (B*O, hidden, T, bins)
         self.shared = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_size, kernel_size=conv_kernel_size, padding=pad),
+            nn.Conv2d(
+                in_channels, hidden_size, kernel_size=conv_kernel_size, padding=pad
+            ),
             nn.GroupNorm(gn_groups, hidden_size),
             nn.GELU(),
             nn.Dropout(dropout),
@@ -90,7 +94,12 @@ class OctaveSharedAggregate(nn.Module):
         B, C, T, F = x.shape
 
         # (B, C, T, (O*bins)) -> (B, O, C, T, bins)
-        x = einops.rearrange(x, "b c t (o bins) -> b o c t bins", o=self.num_octaves, bins=self.bins_per_octave)
+        x = einops.rearrange(
+            x,
+            "b c t (o bins) -> b o c t bins",
+            o=self.num_octaves,
+            bins=self.bins_per_octave,
+        )
 
         # merge (B,O) for shared conv
         octave_features = []
@@ -175,7 +184,9 @@ class AudioFeatureExtractor(nn.Module):
             filter_scale=0.4375,
         )
 
-        self.spec_augment = SpecAugment(**spec_augment_params) if spec_augment_params else None
+        self.spec_augment = (
+            SpecAugment(**spec_augment_params) if spec_augment_params else None
+        )
 
     def forward(self, waveform: torch.Tensor) -> "BackboneContext":
         # center=True の STFT を想定しているため、ラベルと一致するようにクロップする
@@ -193,7 +204,10 @@ class AudioFeatureExtractor(nn.Module):
                 stem_flat = einops.rearrange(stem_waveform, "b c t -> (b c) t")
                 stem_cqt = self.cqt(stem_flat.float(), return_complex=False)
                 stem_cqt = einops.rearrange(
-                    stem_cqt, "(b c) f t -> b c f t", b=batch_size, c=self.channels_per_stem
+                    stem_cqt,
+                    "(b c) f t -> b c f t",
+                    b=batch_size,
+                    c=self.channels_per_stem,
                 ).contiguous()
 
                 if self.spec_augment is not None:
@@ -207,7 +221,9 @@ class AudioFeatureExtractor(nn.Module):
         else:
             waveform_flat = einops.rearrange(waveform, "b c t -> (b c) t")
             spec = self.cqt(waveform_flat.float(), return_complex=False)
-            spec = einops.rearrange(spec, "(b c) f t -> b c f t", c=self.num_audio_channels)
+            spec = einops.rearrange(
+                spec, "(b c) f t -> b c f t", c=self.num_audio_channels
+            )
 
         # 標準化(バッチ単位の全体平均/分散)
         mean = spec.mean(dim=(2, 3), keepdim=True)
@@ -279,7 +295,9 @@ class Backbone(nn.Module):
         self.conv1 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
 
         self.down_conv = nn.Sequential(
-            nn.Conv2d(hidden_size, hidden_size * 2, kernel_size=3, padding=1, stride=(2, 1)),
+            nn.Conv2d(
+                hidden_size, hidden_size * 2, kernel_size=3, padding=1, stride=(2, 1)
+            ),
             nn.GroupNorm(4, hidden_size * 2),
             nn.GELU(),
             nn.Conv2d(
@@ -351,8 +369,12 @@ class Backbone(nn.Module):
         if context is None:
             context = self.feature_extractor(waveform)
 
-        use_checkpoint = self.use_gradient_checkpoint and self.training and torch.is_grad_enabled()
-        checkpoint_fn = torch.utils.checkpoint.checkpoint if use_checkpoint else checkpoint_bypass
+        use_checkpoint = (
+            self.use_gradient_checkpoint and self.training and torch.is_grad_enabled()
+        )
+        checkpoint_fn = (
+            torch.utils.checkpoint.checkpoint if use_checkpoint else checkpoint_bypass
+        )
 
         x = self.oct_frontend(context.spec)  # (B, hidden_size, T, 36)
         x = self.conv1(x)
@@ -382,7 +404,9 @@ class Backbone(nn.Module):
         x = einops.rearrange(x, "b t f d -> b (f d) t")  # [B, F*D, downT]
         x = self.to_time_features(x)  # [B, output_dim, downT]
 
-        context_features = einops.rearrange(x, "b d t -> b t d")  # [B, downT, output_dim]
+        context_features = einops.rearrange(
+            x, "b d t -> b t d"
+        )  # [B, downT, output_dim]
 
         x = self.up_time(x)  # [B, output_dim, downT*8]
 
@@ -401,6 +425,7 @@ class Backbone(nn.Module):
             return x, context_features
 
         return x
+
 
 class DrumAuxHead(nn.Module):
     """
@@ -521,7 +546,9 @@ class BeatTranscriptionModel(nn.Module):
         return_intermediate: bool = False,
     ) -> BeatTranscriptionOutput:
         if return_context and return_intermediate:
-            raise ValueError("return_context and return_intermediate cannot both be True")
+            raise ValueError(
+                "return_context and return_intermediate cannot both be True"
+            )
 
         context_features: Optional[torch.Tensor] = None
         intermediate_features: Optional[List[torch.Tensor]] = None

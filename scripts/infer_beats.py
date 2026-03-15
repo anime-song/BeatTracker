@@ -202,10 +202,7 @@ def infer_use_drum_aux_head(
     if "use_drum_aux_head" in config:
         return bool(config["use_drum_aux_head"])
 
-    return any(
-        key.startswith("head.drum_aux_head.")
-        for key in state_dict.keys()
-    )
+    return any(key.startswith("head.drum_aux_head.") for key in state_dict.keys())
 
 
 def infer_use_drum_high_frequency_flux(

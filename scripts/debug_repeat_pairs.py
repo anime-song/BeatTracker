@@ -23,7 +23,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="繰り返し区間ペアの検出結果を可視化して確認する。"
     )
-    parser.add_argument("--dataset-root", type=Path, default=Path("dataset/meter_dataset"))
+    parser.add_argument(
+        "--dataset-root", type=Path, default=Path("dataset/meter_dataset")
+    )
     parser.add_argument(
         "--audio-backend",
         type=str,
@@ -118,7 +120,9 @@ def find_song(dataset: BeatStemDataset, song_id: str) -> SongEntry:
     raise ValueError(f"song_id が見つかりませんでした: {song_id}")
 
 
-def write_pairs_csv(path: Path, pair_indices: torch.Tensor, pair_mask: torch.Tensor) -> None:
+def write_pairs_csv(
+    path: Path, pair_indices: torch.Tensor, pair_mask: torch.Tensor
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fp:
         writer = csv.writer(fp)
@@ -239,8 +243,8 @@ def write_ssm_svg(path: Path, song_id: str, start_sec: float, debug_info) -> Non
         '<rect width="100%" height="100%" fill="#f7f9fc"/>',
         f'<text x="24" y="30" font-size="22" font-weight="700" fill="#15212b">Repeat Pair Debug</text>',
         f'<text x="24" y="55" font-size="13" fill="#425466">song={html.escape(song_id)} start_sec={start_sec:.2f} '
-        f'{html.escape(debug_info.sync_unit)}_sync={int(debug_info.sync_start_frames.numel())} '
-        f'selected_pairs={int(debug_info.targets.pair_mask.sum().item())}</text>',
+        f"{html.escape(debug_info.sync_unit)}_sync={int(debug_info.sync_start_frames.numel())} "
+        f"selected_pairs={int(debug_info.targets.pair_mask.sum().item())}</text>",
         f'<rect x="{left}" y="{top}" width="{matrix_size}" height="{matrix_size}" fill="#ffffff" stroke="#425466" stroke-width="1.2"/>',
         *_svg_heatmap_cells(similarity, left, top, matrix_size),
         *_svg_run_lines(debug_info.runs, beat_count, left, top, matrix_size),
@@ -277,7 +281,7 @@ def write_ssm_svg(path: Path, song_id: str, start_sec: float, debug_info) -> Non
         for index, run in enumerate(debug_info.runs[:8], start=1):
             lines.append(
                 f'<text x="{left}" y="{run_text_y + index * 18}" font-size="12" fill="#425466">'
-                f'{index}. ({run.start_index_a}, {run.start_index_b}) len={run.length_units} sim={run.mean_similarity:.3f}</text>'
+                f"{index}. ({run.start_index_a}, {run.start_index_b}) len={run.length_units} sim={run.mean_similarity:.3f}</text>"
             )
 
     lines.append("</svg>")
@@ -291,7 +295,9 @@ def main() -> None:
         raise RuntimeError("repeat pair builder が有効化されていません")
 
     song = find_song(dataset, args.song_id)
-    sample = dataset.make_sample(song=song, start_sec=args.start_sec, semitone=args.semitone)
+    sample = dataset.make_sample(
+        song=song, start_sec=args.start_sec, semitone=args.semitone
+    )
     valid_frames = int(sample["valid_mask"].sum().item())
     _, debug_info = dataset.repeat_pair_builder.analyze(
         waveform=sample["waveform"],
@@ -316,13 +322,17 @@ def main() -> None:
         / f"start_{args.start_sec:.2f}"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_summary_json(output_dir / "repeat_debug.json", args, song, valid_frames, debug_info)
+    write_summary_json(
+        output_dir / "repeat_debug.json", args, song, valid_frames, debug_info
+    )
     write_pairs_csv(
         output_dir / "repeat_pairs.csv",
         debug_info.targets.pair_indices.cpu(),
         debug_info.targets.pair_mask.cpu(),
     )
-    write_ssm_svg(output_dir / "repeat_ssm.svg", song.song_id, args.start_sec, debug_info)
+    write_ssm_svg(
+        output_dir / "repeat_ssm.svg", song.song_id, args.start_sec, debug_info
+    )
 
     print(f"song_id={song.song_id}")
     print(f"sync_unit={debug_info.sync_unit}")

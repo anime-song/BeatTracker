@@ -135,9 +135,14 @@ class RepeatPairBuilder:
         valid_frames: int,
     ) -> tuple[RepeatPairTargets, RepeatPairDebugInfo]:
         empty = self.empty(waveform.device)
-        empty_debug = self._empty_debug_info(device=waveform.device, valid_frames=valid_frames)
+        empty_debug = self._empty_debug_info(
+            device=waveform.device, valid_frames=valid_frames
+        )
         event_times = beat_times if self.sync_unit == "beat" else downbeat_times
-        if valid_frames <= 1 or event_times.numel() < self.min_diagonal_length_beats + 1:
+        if (
+            valid_frames <= 1
+            or event_times.numel() < self.min_diagonal_length_beats + 1
+        ):
             return empty, empty_debug
 
         repeat_waveform = self._extract_repeat_waveform(waveform)
@@ -156,10 +161,16 @@ class RepeatPairBuilder:
                 sync_unit=self.sync_unit,
                 valid_frames=available_frames,
                 sync_frame_indices=sync_frame_indices,
-                sync_start_frames=torch.empty(0, dtype=torch.long, device=waveform.device),
+                sync_start_frames=torch.empty(
+                    0, dtype=torch.long, device=waveform.device
+                ),
                 sync_labels=tuple(),
-                sync_features=torch.empty((0, 12), dtype=waveform.dtype, device=waveform.device),
-                similarity_matrix=torch.empty((0, 0), dtype=waveform.dtype, device=waveform.device),
+                sync_features=torch.empty(
+                    (0, 12), dtype=waveform.dtype, device=waveform.device
+                ),
+                similarity_matrix=torch.empty(
+                    (0, 0), dtype=waveform.dtype, device=waveform.device
+                ),
                 runs=tuple(),
                 targets=empty,
             )
@@ -180,7 +191,9 @@ class RepeatPairBuilder:
                 sync_start_frames=sync_start_frames,
                 sync_labels=sync_labels,
                 sync_features=sync_features,
-                similarity_matrix=torch.empty((0, 0), dtype=waveform.dtype, device=waveform.device),
+                similarity_matrix=torch.empty(
+                    (0, 0), dtype=waveform.dtype, device=waveform.device
+                ),
                 runs=tuple(),
                 targets=empty,
             )
@@ -288,7 +301,9 @@ class RepeatPairBuilder:
         within = (event_times >= start_sec) & (event_times < end_sec)
         if not torch.any(within):
             empty_frames = torch.empty(0, dtype=torch.long, device=event_times.device)
-            empty_times = torch.empty(0, dtype=event_times.dtype, device=event_times.device)
+            empty_times = torch.empty(
+                0, dtype=event_times.dtype, device=event_times.device
+            )
             return empty_frames, empty_times
 
         local_event_times = event_times[within]
@@ -315,7 +330,9 @@ class RepeatPairBuilder:
 
         return (
             torch.tensor(unique_frames, dtype=torch.long, device=event_times.device),
-            torch.tensor(unique_times, dtype=event_times.dtype, device=event_times.device),
+            torch.tensor(
+                unique_times, dtype=event_times.dtype, device=event_times.device
+            ),
         )
 
     def _compute_sync_chroma(
@@ -539,6 +556,8 @@ class RepeatPairBuilder:
                 pair_mask[pair_count] = 1.0
                 pair_count += 1
                 if pair_count >= self.max_pairs:
-                    return RepeatPairTargets(pair_indices=pair_indices, pair_mask=pair_mask)
+                    return RepeatPairTargets(
+                        pair_indices=pair_indices, pair_mask=pair_mask
+                    )
 
         return RepeatPairTargets(pair_indices=pair_indices, pair_mask=pair_mask)

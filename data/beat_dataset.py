@@ -179,14 +179,21 @@ def derive_beat_downbeat_and_meter_annotations(
     )
 
 
-def derive_beat_and_downbeat_times(annotation_path: Path) -> tuple[torch.Tensor, torch.Tensor, float]:
-    beat_tensor, downbeat_tensor, song_end_sec, _ = (
-        derive_beat_downbeat_and_meter_annotations(annotation_path)
-    )
+def derive_beat_and_downbeat_times(
+    annotation_path: Path,
+) -> tuple[torch.Tensor, torch.Tensor, float]:
+    (
+        beat_tensor,
+        downbeat_tensor,
+        song_end_sec,
+        _,
+    ) = derive_beat_downbeat_and_meter_annotations(annotation_path)
     return beat_tensor, downbeat_tensor, song_end_sec
 
 
-def _discover_stem_variants(song_dir: Path, song_id: str, stem_names: Sequence[str]) -> Dict[int, Dict[str, Path]]:
+def _discover_stem_variants(
+    song_dir: Path, song_id: str, stem_names: Sequence[str]
+) -> Dict[int, Dict[str, Path]]:
     variants: Dict[int, Dict[str, Path]] = {}
     for stem_name in stem_names:
         prefix = f"{song_id}_{stem_name}"
@@ -211,7 +218,9 @@ def _discover_stem_variants(song_dir: Path, song_id: str, stem_names: Sequence[s
     complete_variants: Dict[int, Dict[str, Path]] = {}
     for semitone, stem_map in variants.items():
         if all(stem_name in stem_map for stem_name in stem_names):
-            complete_variants[semitone] = {stem_name: stem_map[stem_name] for stem_name in stem_names}
+            complete_variants[semitone] = {
+                stem_name: stem_map[stem_name] for stem_name in stem_names
+            }
     return complete_variants
 
 
@@ -300,7 +309,9 @@ class BeatStemDataset(Dataset):
         self.dataset_root = Path(dataset_root)
         self.songs_dir = self.dataset_root / "songs_separated"
         self.packed_audio_dir = (
-            Path(packed_audio_dir) if packed_audio_dir is not None else (self.dataset_root / "songs_packed")
+            Path(packed_audio_dir)
+            if packed_audio_dir is not None
+            else (self.dataset_root / "songs_packed")
         )
         self.annotations_dir = self.dataset_root / "annotations" / "beats"
         self.split_path = self.dataset_root / "single.split"
@@ -343,7 +354,9 @@ class BeatStemDataset(Dataset):
 
         split_map = _read_split_map(self.split_path)
         songs: list[SongEntry] = []
-        audio_root = self.songs_dir if self.audio_backend == "wav" else self.packed_audio_dir
+        audio_root = (
+            self.songs_dir if self.audio_backend == "wav" else self.packed_audio_dir
+        )
         if not audio_root.exists():
             raise ValueError(f"Audio root does not exist: {audio_root}")
 
@@ -365,7 +378,9 @@ class BeatStemDataset(Dataset):
 
             if self.audio_backend == "wav":
                 # 曲ごとに「どの semitone なら全 stem が揃っているか」を先に集計する。
-                stems_by_semitone = _discover_stem_variants(song_dir, song_id, self.stem_names)
+                stems_by_semitone = _discover_stem_variants(
+                    song_dir, song_id, self.stem_names
+                )
                 if not include_original:
                     stems_by_semitone.pop(0, None)
                 if allowed_pitch_set is not None:
@@ -378,23 +393,34 @@ class BeatStemDataset(Dataset):
                     continue
 
                 # メタデータ確認用の代表 variant。
-                preferred_semitone = 0 if 0 in stems_by_semitone else sorted(stems_by_semitone)[0]
+                preferred_semitone = (
+                    0 if 0 in stems_by_semitone else sorted(stems_by_semitone)[0]
+                )
                 reference_paths = stems_by_semitone[preferred_semitone]
-                reference_infos = [sf.info(str(reference_paths[stem_name])) for stem_name in self.stem_names]
+                reference_infos = [
+                    sf.info(str(reference_paths[stem_name]))
+                    for stem_name in self.stem_names
+                ]
 
                 reference_sample_rate = reference_infos[0].samplerate
                 channels_per_stem = reference_infos[0].channels
-                if any(info.samplerate != reference_sample_rate for info in reference_infos):
+                if any(
+                    info.samplerate != reference_sample_rate for info in reference_infos
+                ):
                     raise ValueError(f"Mismatched sample rates in {song_dir}")
                 if any(info.channels != channels_per_stem for info in reference_infos):
                     raise ValueError(f"Mismatched channel counts in {song_dir}")
 
                 # stem ごとに数サンプルの差があっても安全側に倒すため、最短長を採用する。
-                audio_duration_sec = min(info.frames for info in reference_infos) / float(reference_sample_rate)
+                audio_duration_sec = min(
+                    info.frames for info in reference_infos
+                ) / float(reference_sample_rate)
                 available_semitones = tuple(sorted(stems_by_semitone))
             else:
                 # packed backend では、曲ごとの npy/json を semitone 単位で解決する。
-                packed_variants = _discover_packed_variants(song_dir, song_id, self.stem_names)
+                packed_variants = _discover_packed_variants(
+                    song_dir, song_id, self.stem_names
+                )
                 if not include_original:
                     packed_variants.pop(0, None)
                 if allowed_pitch_set is not None:
@@ -406,7 +432,9 @@ class BeatStemDataset(Dataset):
                 if not packed_variants:
                     continue
 
-                preferred_semitone = 0 if 0 in packed_variants else sorted(packed_variants)[0]
+                preferred_semitone = (
+                    0 if 0 in packed_variants else sorted(packed_variants)[0]
+                )
                 reference_variant = packed_variants[preferred_semitone]
                 reference_sample_rate = reference_variant.sample_rate
                 channels_per_stem = reference_variant.channels_per_stem
@@ -415,18 +443,26 @@ class BeatStemDataset(Dataset):
                     raise ValueError(
                         f"Unexpected num_channels in packed audio for {song_id}: {reference_variant.num_channels}"
                     )
-                if any(variant.sample_rate != reference_sample_rate for variant in packed_variants.values()):
+                if any(
+                    variant.sample_rate != reference_sample_rate
+                    for variant in packed_variants.values()
+                ):
                     raise ValueError(f"Mismatched packed sample rates in {song_dir}")
-                if any(variant.channels_per_stem != channels_per_stem for variant in packed_variants.values()):
+                if any(
+                    variant.channels_per_stem != channels_per_stem
+                    for variant in packed_variants.values()
+                ):
                     raise ValueError(f"Mismatched packed channel counts in {song_dir}")
-                if any(variant.num_channels != expected_num_channels for variant in packed_variants.values()):
+                if any(
+                    variant.num_channels != expected_num_channels
+                    for variant in packed_variants.values()
+                ):
                     raise ValueError(f"Mismatched packed num_channels in {song_dir}")
 
                 # packed variant ごとにフレーム長が少し違っても安全側へ倒す。
-                audio_duration_sec = (
-                    min(variant.num_frames for variant in packed_variants.values())
-                    / float(reference_sample_rate)
-                )
+                audio_duration_sec = min(
+                    variant.num_frames for variant in packed_variants.values()
+                ) / float(reference_sample_rate)
                 available_semitones = tuple(sorted(packed_variants))
 
             (
@@ -435,7 +471,11 @@ class BeatStemDataset(Dataset):
                 label_duration_sec,
                 meter_annotations,
             ) = derive_beat_downbeat_and_meter_annotations(annotation_path)
-            effective_duration_sec = min(audio_duration_sec, label_duration_sec) if label_duration_sec > 0 else audio_duration_sec
+            effective_duration_sec = (
+                min(audio_duration_sec, label_duration_sec)
+                if label_duration_sec > 0
+                else audio_duration_sec
+            )
             if effective_duration_sec <= 0:
                 continue
 
@@ -463,7 +503,9 @@ class BeatStemDataset(Dataset):
         source_sample_rates = {song.sample_rate for song in songs}
         if sample_rate is None:
             if len(source_sample_rates) != 1:
-                raise ValueError("sample_rate must be set explicitly when source sample rates are mixed")
+                raise ValueError(
+                    "sample_rate must be set explicitly when source sample rates are mixed"
+                )
             sample_rate = next(iter(source_sample_rates))
         self.sample_rate = int(sample_rate)
 
@@ -477,7 +519,9 @@ class BeatStemDataset(Dataset):
         if self.segment_samples < self.n_fft:
             raise ValueError("segment_seconds is too short for the configured n_fft")
         # モデル側の crop_length と一致するよう、center=True の STFT/CQT を前提にした長さで持つ。
-        self.target_num_frames = 1 + ((self.segment_samples - self.n_fft) // self.hop_length)
+        self.target_num_frames = 1 + (
+            (self.segment_samples - self.n_fft) // self.hop_length
+        )
         # 補助ターゲット生成は別クラスに切り出して、dataset 本体を薄く保つ。
         self.aux_target_builder = StemAuxTargetBuilder(
             stem_names=self.stem_names,
@@ -648,7 +692,9 @@ class BeatStemDataset(Dataset):
             )
 
         if loaded_sample_rate != self.sample_rate:
-            waveform = AF.resample(waveform, orig_freq=loaded_sample_rate, new_freq=self.sample_rate)
+            waveform = AF.resample(
+                waveform, orig_freq=loaded_sample_rate, new_freq=self.sample_rate
+            )
 
         # 終端付近で短く読まれた場合はゼロ埋めし、valid_samples で実データ範囲だけ管理する。
         valid_samples = min(waveform.shape[-1], self.segment_samples)
@@ -697,7 +743,9 @@ class BeatStemDataset(Dataset):
             )
 
         if source_sample_rate != self.sample_rate:
-            waveform = AF.resample(waveform, orig_freq=source_sample_rate, new_freq=self.sample_rate)
+            waveform = AF.resample(
+                waveform, orig_freq=source_sample_rate, new_freq=self.sample_rate
+            )
 
         valid_samples = min(waveform.shape[-1], self.segment_samples)
         if waveform.shape[-1] < self.segment_samples:
@@ -725,8 +773,12 @@ class BeatStemDataset(Dataset):
 
         relative_times = event_times[within_crop] - start_sec
         # 音声と同じ sample_rate / hop_length でフレーム番号へ量子化する。
-        frame_indices = torch.round(relative_times * self.sample_rate / self.hop_length).long()
-        frame_indices = frame_indices[(frame_indices >= 0) & (frame_indices < valid_frames)]
+        frame_indices = torch.round(
+            relative_times * self.sample_rate / self.hop_length
+        ).long()
+        frame_indices = frame_indices[
+            (frame_indices >= 0) & (frame_indices < valid_frames)
+        ]
         if frame_indices.numel() > 0:
             targets[frame_indices.unique()] = 1.0
         return targets
@@ -791,9 +843,7 @@ class BeatStemDataset(Dataset):
                 target_num_frames=valid_frames,
                 valid_frames=valid_frames,
             )
-            labeled_targets = meter_targets[
-                meter_targets != self.meter_ignore_index
-            ]
+            labeled_targets = meter_targets[meter_targets != self.meter_ignore_index]
             if labeled_targets.numel() == 0:
                 continue
 
@@ -809,20 +859,30 @@ class BeatStemDataset(Dataset):
         semitone: Optional[int] = None,
     ) -> dict[str, torch.Tensor | str | int | float]:
         if semitone is None:
-            semitone = 0 if 0 in song.available_semitones else song.available_semitones[0]
+            semitone = (
+                0 if 0 in song.available_semitones else song.available_semitones[0]
+            )
         if self.audio_backend == "packed":
             if semitone not in song.packed_variants:
-                raise ValueError(f"Semitone {semitone} is not available for song {song.song_id}")
-            waveform, valid_samples = self._load_packed_audio_crop(song, semitone, start_sec)
+                raise ValueError(
+                    f"Semitone {semitone} is not available for song {song.song_id}"
+                )
+            waveform, valid_samples = self._load_packed_audio_crop(
+                song, semitone, start_sec
+            )
         else:
             if semitone not in song.stems_by_semitone:
-                raise ValueError(f"Semitone {semitone} is not available for song {song.song_id}")
+                raise ValueError(
+                    f"Semitone {semitone} is not available for song {song.song_id}"
+                )
 
             stem_waveforms: list[torch.Tensor] = []
             valid_samples = self.segment_samples
             for stem_name in self.stem_names:
                 wav_path = song.stems_by_semitone[semitone][stem_name]
-                stem_waveform, stem_valid_samples = self._load_audio_crop(song, wav_path, start_sec)
+                stem_waveform, stem_valid_samples = self._load_audio_crop(
+                    song, wav_path, start_sec
+                )
                 stem_waveforms.append(stem_waveform)
                 valid_samples = min(valid_samples, stem_valid_samples)
 
@@ -831,14 +891,21 @@ class BeatStemDataset(Dataset):
 
         valid_frames = 0
         if valid_samples >= self.n_fft:
-            valid_frames = min(self.target_num_frames, 1 + ((valid_samples - self.n_fft) // self.hop_length))
+            valid_frames = min(
+                self.target_num_frames,
+                1 + ((valid_samples - self.n_fft) // self.hop_length),
+            )
 
         # ゼロ埋め領域や、STFT 窓が成立しない末尾フレームを loss から外すためのマスク。
         valid_mask = torch.zeros(self.target_num_frames, dtype=torch.float32)
         valid_mask[:valid_frames] = 1.0
 
-        beat_targets = self._events_to_frame_targets(song.beat_times, start_sec, valid_frames)
-        downbeat_targets = self._events_to_frame_targets(song.downbeat_times, start_sec, valid_frames)
+        beat_targets = self._events_to_frame_targets(
+            song.beat_times, start_sec, valid_frames
+        )
+        downbeat_targets = self._events_to_frame_targets(
+            song.downbeat_times, start_sec, valid_frames
+        )
         meter_targets = self._meter_annotations_to_frame_targets(
             song=song,
             start_sec=start_sec,
@@ -903,14 +970,20 @@ class BeatStemDataset(Dataset):
         song = self.songs[index % len(self.songs)]
 
         if not self.random_pitch_shift:
-            semitone = 0 if 0 in song.available_semitones else song.available_semitones[0]
+            semitone = (
+                0 if 0 in song.available_semitones else song.available_semitones[0]
+            )
         elif len(song.available_semitones) == 1:
             semitone = song.available_semitones[0]
         else:
             # 1 サンプル内では全 stem 共通の semitone を使う。
-            semitone_index = int(torch.randint(len(song.available_semitones), size=(1,)).item())
+            semitone_index = int(
+                torch.randint(len(song.available_semitones), size=(1,)).item()
+            )
             semitone = song.available_semitones[semitone_index]
 
         max_start_sec = max(song.effective_duration_sec - self.segment_seconds, 0.0)
-        start_sec = 0.0 if max_start_sec <= 0 else float(torch.rand(1).item() * max_start_sec)
+        start_sec = (
+            0.0 if max_start_sec <= 0 else float(torch.rand(1).item() * max_start_sec)
+        )
         return self.make_sample(song, start_sec=start_sec, semitone=semitone)
