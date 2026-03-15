@@ -72,6 +72,27 @@ def masked_l1_loss(
     return weighted.sum() / normalizer
 
 
+def masked_index_pair_l1_loss(
+    sequence: torch.Tensor,
+    pair_indices: torch.Tensor,
+    pair_mask: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """
+    sequence: (B, T)
+    pair_indices: (B, P, 2)
+    pair_mask: (B, P)
+    """
+    left = torch.gather(sequence, 1, pair_indices[..., 0])
+    right = torch.gather(sequence, 1, pair_indices[..., 1])
+    diff = (left - right).abs()
+    if pair_mask is None:
+        return diff.mean()
+
+    weighted = diff * pair_mask.to(diff.dtype)
+    normalizer = pair_mask.sum().clamp_min(1.0).to(diff.dtype)
+    return weighted.sum() / normalizer
+
+
 # https://github.com/CPJKU/beat_this/blob/main/beat_this/model/loss.py
 class ShiftTolerantBCELoss(torch.nn.Module):
     """

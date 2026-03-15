@@ -31,6 +31,11 @@ class ExperimentSummary:
     meter_loss_weight: Optional[float]
     drum_aux_loss_weight: Optional[float]
     drum_aux_use_high_frequency_flux: Optional[bool]
+    repeat_consistency_loss_weight: Optional[float]
+    repeat_ssm_threshold: Optional[float]
+    repeat_ssm_min_length_beats: Optional[int]
+    repeat_ssm_near_diagonal_margin_beats: Optional[int]
+    repeat_ssm_max_length_beats: Optional[int]
     stem_dropout_max_count: Optional[int]
     init_scope: Optional[str]
     init_from: Optional[str]
@@ -81,6 +86,21 @@ class ExperimentSummary:
             "drum_aux_use_high_frequency_flux": ""
             if self.drum_aux_use_high_frequency_flux is None
             else str(self.drum_aux_use_high_frequency_flux).lower(),
+            "repeat_consistency_loss_weight": _format_float(
+                self.repeat_consistency_loss_weight, digits=3
+            ),
+            "repeat_ssm_threshold": _format_float(
+                self.repeat_ssm_threshold, digits=3
+            ),
+            "repeat_ssm_min_length_beats": _format_int(
+                self.repeat_ssm_min_length_beats
+            ),
+            "repeat_ssm_near_diagonal_margin_beats": _format_int(
+                self.repeat_ssm_near_diagonal_margin_beats
+            ),
+            "repeat_ssm_max_length_beats": _format_int(
+                self.repeat_ssm_max_length_beats
+            ),
             "stem_dropout_max_count": _format_int(self.stem_dropout_max_count),
             "init_scope": self.init_scope or "",
             "init_from": self.init_from or "",
@@ -258,6 +278,19 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         drum_aux_use_high_frequency_flux=_as_bool(
             config.get("drum_aux_use_high_frequency_flux")
         ),
+        repeat_consistency_loss_weight=_as_float(
+            config.get("repeat_consistency_loss_weight")
+        ),
+        repeat_ssm_threshold=_as_float(config.get("repeat_ssm_threshold")),
+        repeat_ssm_min_length_beats=_as_int(
+            config.get("repeat_ssm_min_length_beats")
+        ),
+        repeat_ssm_near_diagonal_margin_beats=_as_int(
+            config.get("repeat_ssm_near_diagonal_margin_beats")
+        ),
+        repeat_ssm_max_length_beats=_as_int(
+            config.get("repeat_ssm_max_length_beats")
+        ),
         stem_dropout_max_count=_as_int(config.get("stem_dropout_max_count")),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
@@ -322,6 +355,11 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "meter_loss_weight",
         "drum_aux_loss_weight",
         "drum_aux_use_high_frequency_flux",
+        "repeat_consistency_loss_weight",
+        "repeat_ssm_threshold",
+        "repeat_ssm_min_length_beats",
+        "repeat_ssm_near_diagonal_margin_beats",
+        "repeat_ssm_max_length_beats",
         "stem_dropout_max_count",
         "init_scope",
         "init_from",
@@ -539,6 +577,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             "-"
             if summary.drum_aux_use_high_frequency_flux is None
             else str(summary.drum_aux_use_high_frequency_flux).lower(),
+            _format_float(summary.repeat_consistency_loss_weight, digits=3) or "-",
             _format_int(summary.stem_dropout_max_count) or "-",
             (
                 summary.init_scope
@@ -566,6 +605,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "meter_w",
                 "drum_aux_w",
                 "drum_hf",
+                "repeat_w",
                 "stem_drop",
                 "init",
                 "model",
@@ -627,6 +667,31 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                             "-"
                             if summary.drum_aux_use_high_frequency_flux is None
                             else str(summary.drum_aux_use_high_frequency_flux).lower(),
+                        ],
+                        [
+                            "repeat_consistency_loss_weight",
+                            _format_float(
+                                summary.repeat_consistency_loss_weight, digits=3
+                            )
+                            or "-",
+                        ],
+                        [
+                            "repeat_ssm_threshold",
+                            _format_float(summary.repeat_ssm_threshold, digits=3)
+                            or "-",
+                        ],
+                        [
+                            "repeat_ssm_min_length_beats",
+                            _format_int(summary.repeat_ssm_min_length_beats) or "-",
+                        ],
+                        [
+                            "repeat_ssm_near_diagonal_margin_beats",
+                            _format_int(summary.repeat_ssm_near_diagonal_margin_beats)
+                            or "-",
+                        ],
+                        [
+                            "repeat_ssm_max_length_beats",
+                            _format_int(summary.repeat_ssm_max_length_beats) or "-",
                         ],
                         [
                             "stem_dropout_max_count",
