@@ -1,0 +1,220 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1708" height="520" viewBox="0 0 1708 520">
+<rect width="100%" height="100%" fill="#f7f9fc"/>
+<text x="24" y="22" font-size="18" font-weight="700" fill="#15212b">Best Downbeat F1 Progress</text>
+<text x="24" y="42" font-size="12" fill="#425466">x-axis is estimated completion order from history/config file timestamps.</text>
+<line x1="72" y1="350.0" x2="1684" y2="350.0" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="354.0" text-anchor="end" font-size="12" fill="#425466">0.200</text>
+<line x1="72" y1="285.6" x2="1684" y2="285.6" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="289.6" text-anchor="end" font-size="12" fill="#425466">0.260</text>
+<line x1="72" y1="221.2" x2="1684" y2="221.2" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="225.2" text-anchor="end" font-size="12" fill="#425466">0.320</text>
+<line x1="72" y1="156.8" x2="1684" y2="156.8" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="160.8" text-anchor="end" font-size="12" fill="#425466">0.380</text>
+<line x1="72" y1="92.4" x2="1684" y2="92.4" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="96.4" text-anchor="end" font-size="12" fill="#425466">0.440</text>
+<line x1="72" y1="28.0" x2="1684" y2="28.0" stroke="#d7dce2" stroke-width="1"/>
+<text x="62" y="32.0" text-anchor="end" font-size="12" fill="#425466">0.500</text>
+<line x1="72" y1="28" x2="72" y2="350" stroke="#425466" stroke-width="1.2"/>
+<line x1="72" y1="350" x2="1684" y2="350" stroke="#425466" stroke-width="1.2"/>
+<g>
+<title>beat_transcription&#10;best_downbeat_f1=0.3141&#10;completed_at~2026-03-12 16:43:41 UTC</title>
+<rect x="60.0" y="227.5" width="24" height="122.5" fill="#8fb8de" opacity="0.85"/>
+<circle cx="72.0" cy="227.5" r="3.5" fill="#1f5f99"/>
+<text x="72.0" y="368.0" text-anchor="middle" font-size="11" fill="#425466">1</text>
+<text x="68.0" y="382.0" transform="rotate(60 68.0,382.0)" font-size="11" fill="#425466">beat_transcription</text>
+</g>
+<g>
+<title>exp_beat_plus_downbeat_logits&#10;best_downbeat_f1=0.3371&#10;completed_at~2026-03-13 01:30:16 UTC</title>
+<rect x="119.7" y="202.9" width="24" height="147.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="131.7" cy="202.9" r="3.5" fill="#1f5f99"/>
+<text x="131.7" y="368.0" text-anchor="middle" font-size="11" fill="#425466">2</text>
+<text x="127.7" y="382.0" transform="rotate(60 127.7,382.0)" font-size="11" fill="#425466">exp_beat_plus_downbeat_logits</text>
+</g>
+<g>
+<title>exp_meter_classification&#10;best_downbeat_f1=0.2561&#10;completed_at~2026-03-13 02:52:15 UTC</title>
+<rect x="179.4" y="289.8" width="24" height="60.2" fill="#8fb8de" opacity="0.85"/>
+<circle cx="191.4" cy="289.8" r="3.5" fill="#1f5f99"/>
+<text x="191.4" y="368.0" text-anchor="middle" font-size="11" fill="#425466">3</text>
+<text x="187.4" y="382.0" transform="rotate(60 187.4,382.0)" font-size="11" fill="#425466">exp_meter_classification</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_1&#10;best_downbeat_f1=0.3508&#10;completed_at~2026-03-13 04:05:38 UTC</title>
+<rect x="239.1" y="188.1" width="24" height="161.9" fill="#8fb8de" opacity="0.85"/>
+<circle cx="251.1" cy="188.1" r="3.5" fill="#1f5f99"/>
+<text x="251.1" y="368.0" text-anchor="middle" font-size="11" fill="#425466">4</text>
+<text x="247.1" y="382.0" transform="rotate(60 247.1,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_1</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_3&#10;best_downbeat_f1=0.3249&#10;completed_at~2026-03-13 05:19:21 UTC</title>
+<rect x="298.8" y="215.9" width="24" height="134.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="310.8" cy="215.9" r="3.5" fill="#1f5f99"/>
+<text x="310.8" y="368.0" text-anchor="middle" font-size="11" fill="#425466">5</text>
+<text x="306.8" y="382.0" transform="rotate(60 306.8,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_3</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5&#10;best_downbeat_f1=0.3903&#10;completed_at~2026-03-13 06:28:31 UTC</title>
+<rect x="358.5" y="145.7" width="24" height="204.3" fill="#8fb8de" opacity="0.85"/>
+<circle cx="370.5" cy="145.7" r="3.5" fill="#1f5f99"/>
+<text x="370.5" y="368.0" text-anchor="middle" font-size="11" fill="#425466">6</text>
+<text x="366.5" y="382.0" transform="rotate(60 366.5,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5</text>
+</g>
+<g>
+<title>exp_meter_numerator_w0_05&#10;best_downbeat_f1=0.3398&#10;completed_at~2026-03-13 07:51:48 UTC</title>
+<rect x="418.2" y="199.9" width="24" height="150.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="430.2" cy="199.9" r="3.5" fill="#1f5f99"/>
+<text x="430.2" y="368.0" text-anchor="middle" font-size="11" fill="#425466">7</text>
+<text x="426.2" y="382.0" transform="rotate(60 426.2,382.0)" font-size="11" fill="#425466">exp_meter_numerator_w0_05</text>
+</g>
+<g>
+<title>exp_meter_context_lowres_w0_05&#10;best_downbeat_f1=0.3382&#10;completed_at~2026-03-13 09:11:30 UTC</title>
+<rect x="477.9" y="201.6" width="24" height="148.4" fill="#8fb8de" opacity="0.85"/>
+<circle cx="489.9" cy="201.6" r="3.5" fill="#1f5f99"/>
+<text x="489.9" y="368.0" text-anchor="middle" font-size="11" fill="#425466">8</text>
+<text x="485.9" y="382.0" transform="rotate(60 485.9,382.0)" font-size="11" fill="#425466">exp_meter_context_lowres_w0_05</text>
+</g>
+<g>
+<title>exp_meter_downbeat_conditioning_w0_05&#10;best_downbeat_f1=0.3248&#10;completed_at~2026-03-13 11:46:17 UTC</title>
+<rect x="537.6" y="216.0" width="24" height="134.0" fill="#8fb8de" opacity="0.85"/>
+<circle cx="549.6" cy="216.0" r="3.5" fill="#1f5f99"/>
+<text x="549.6" y="368.0" text-anchor="middle" font-size="11" fill="#425466">9</text>
+<text x="545.6" y="382.0" transform="rotate(60 545.6,382.0)" font-size="11" fill="#425466">exp_meter_downbeat_conditioning_w0_05</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_beatpw10&#10;best_downbeat_f1=0.3599&#10;completed_at~2026-03-13 13:54:50 UTC</title>
+<rect x="597.3" y="178.4" width="24" height="171.6" fill="#8fb8de" opacity="0.85"/>
+<circle cx="609.3" cy="178.4" r="3.5" fill="#1f5f99"/>
+<text x="609.3" y="368.0" text-anchor="middle" font-size="11" fill="#425466">10</text>
+<text x="605.3" y="382.0" transform="rotate(60 605.3,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_beatpw10</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_beatpw7_5&#10;best_downbeat_f1=0.3493&#10;completed_at~2026-03-13 15:04:31 UTC</title>
+<rect x="657.0" y="189.7" width="24" height="160.3" fill="#8fb8de" opacity="0.85"/>
+<circle cx="669.0" cy="189.7" r="3.5" fill="#1f5f99"/>
+<text x="669.0" y="368.0" text-anchor="middle" font-size="11" fill="#425466">11</text>
+<text x="665.0" y="382.0" transform="rotate(60 665.0,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_beatpw7_5</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_02_t0_00&#10;best_downbeat_f1=0.3504&#10;completed_at~2026-03-13 16:51:27 UTC</title>
+<rect x="716.7" y="188.6" width="24" height="161.4" fill="#8fb8de" opacity="0.85"/>
+<circle cx="728.7" cy="188.6" r="3.5" fill="#1f5f99"/>
+<text x="728.7" y="368.0" text-anchor="middle" font-size="11" fill="#425466">12</text>
+<text x="724.7" y="382.0" transform="rotate(60 724.7,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_02_t0_00</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_05_t0_00&#10;best_downbeat_f1=0.3146&#10;completed_at~2026-03-13 17:55:49 UTC</title>
+<rect x="776.4" y="227.0" width="24" height="123.0" fill="#8fb8de" opacity="0.85"/>
+<circle cx="788.4" cy="227.0" r="3.5" fill="#1f5f99"/>
+<text x="788.4" y="368.0" text-anchor="middle" font-size="11" fill="#425466">13</text>
+<text x="784.4" y="382.0" transform="rotate(60 784.4,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_05_t0_00</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_00_t0_05&#10;best_downbeat_f1=0.3743&#10;completed_at~2026-03-13 19:00:25 UTC</title>
+<rect x="836.1" y="162.9" width="24" height="187.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="848.1" cy="162.9" r="3.5" fill="#1f5f99"/>
+<text x="848.1" y="368.0" text-anchor="middle" font-size="11" fill="#425466">14</text>
+<text x="844.1" y="382.0" transform="rotate(60 844.1,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_00_t0_05</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_00_t0_10&#10;best_downbeat_f1=0.3581&#10;completed_at~2026-03-13 20:04:53 UTC</title>
+<rect x="895.9" y="180.3" width="24" height="169.7" fill="#8fb8de" opacity="0.85"/>
+<circle cx="907.9" cy="180.3" r="3.5" fill="#1f5f99"/>
+<text x="907.9" y="368.0" text-anchor="middle" font-size="11" fill="#425466">15</text>
+<text x="903.9" y="382.0" transform="rotate(60 903.9,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_00_t0_10</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_02_t0_05&#10;best_downbeat_f1=0.3705&#10;completed_at~2026-03-13 21:09:27 UTC</title>
+<rect x="955.6" y="166.9" width="24" height="183.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="967.6" cy="166.9" r="3.5" fill="#1f5f99"/>
+<text x="967.6" y="368.0" text-anchor="middle" font-size="11" fill="#425466">16</text>
+<text x="963.6" y="382.0" transform="rotate(60 963.6,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_02_t0_05</text>
+</g>
+<g>
+<title>exp_meter_classification_w0_0_5_specaug_f0_05_t0_10&#10;best_downbeat_f1=0.3604&#10;completed_at~2026-03-13 22:13:57 UTC</title>
+<rect x="1015.3" y="177.9" width="24" height="172.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1027.3" cy="177.9" r="3.5" fill="#1f5f99"/>
+<text x="1027.3" y="368.0" text-anchor="middle" font-size="11" fill="#425466">17</text>
+<text x="1023.3" y="382.0" transform="rotate(60 1023.3,382.0)" font-size="11" fill="#425466">exp_meter_classification_w0_0_5_specaug_f0_05_t0_10</text>
+</g>
+<g>
+<title>exp_time_stretch_pm50&#10;best_downbeat_f1=0.3476&#10;completed_at~2026-03-14 02:53:04 UTC</title>
+<rect x="1075.0" y="191.6" width="24" height="158.4" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1087.0" cy="191.6" r="3.5" fill="#1f5f99"/>
+<text x="1087.0" y="368.0" text-anchor="middle" font-size="11" fill="#425466">18</text>
+<text x="1083.0" y="382.0" transform="rotate(60 1083.0,382.0)" font-size="11" fill="#425466">exp_time_stretch_pm50</text>
+</g>
+<g>
+<title>exp_chord_preinit_backbone&#10;best_downbeat_f1=0.4471&#10;completed_at~2026-03-14 04:28:02 UTC</title>
+<rect x="1134.7" y="84.8" width="24" height="265.2" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1146.7" cy="84.8" r="3.5" fill="#1f5f99"/>
+<text x="1146.7" y="368.0" text-anchor="middle" font-size="11" fill="#425466">19</text>
+<text x="1142.7" y="382.0" transform="rotate(60 1142.7,382.0)" font-size="11" fill="#425466">exp_chord_preinit_backbone</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2&#10;best_downbeat_f1=0.4519&#10;completed_at~2026-03-14 06:27:47 UTC</title>
+<rect x="1194.4" y="79.7" width="24" height="270.3" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1206.4" cy="79.7" r="3.5" fill="#1f5f99"/>
+<text x="1206.4" y="368.0" text-anchor="middle" font-size="11" fill="#425466">20</text>
+<text x="1202.4" y="382.0" transform="rotate(60 1202.4,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_phase&#10;best_downbeat_f1=0.4409&#10;completed_at~2026-03-14 07:54:13 UTC</title>
+<rect x="1254.1" y="91.4" width="24" height="258.6" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1266.1" cy="91.4" r="3.5" fill="#1f5f99"/>
+<text x="1266.1" y="368.0" text-anchor="middle" font-size="11" fill="#425466">21</text>
+<text x="1262.1" y="382.0" transform="rotate(60 1262.1,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_phase</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_metertau0_5&#10;best_downbeat_f1=0.4401&#10;completed_at~2026-03-14 09:15:33 UTC</title>
+<rect x="1313.8" y="92.3" width="24" height="257.7" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1325.8" cy="92.3" r="3.5" fill="#1f5f99"/>
+<text x="1325.8" y="368.0" text-anchor="middle" font-size="11" fill="#425466">22</text>
+<text x="1321.8" y="382.0" transform="rotate(60 1321.8,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_metertau0_5</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux&#10;best_downbeat_f1=0.4598&#10;completed_at~2026-03-14 10:44:21 UTC</title>
+<rect x="1373.5" y="71.1" width="24" height="278.9" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1385.5" cy="71.1" r="3.5" fill="#1f5f99"/>
+<text x="1385.5" y="368.0" text-anchor="middle" font-size="11" fill="#425466">23</text>
+<text x="1381.5" y="382.0" transform="rotate(60 1381.5,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux_bassaux&#10;best_downbeat_f1=0.4442&#10;completed_at~2026-03-14 12:07:52 UTC</title>
+<rect x="1433.2" y="87.9" width="24" height="262.1" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1445.2" cy="87.9" r="3.5" fill="#1f5f99"/>
+<text x="1445.2" y="368.0" text-anchor="middle" font-size="11" fill="#425466">24</text>
+<text x="1441.2" y="382.0" transform="rotate(60 1441.2,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux_bassaux</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux_basslowflux&#10;best_downbeat_f1=0.4536&#10;completed_at~2026-03-14 13:26:46 UTC</title>
+<rect x="1492.9" y="77.8" width="24" height="272.2" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1504.9" cy="77.8" r="3.5" fill="#1f5f99"/>
+<text x="1504.9" y="368.0" text-anchor="middle" font-size="11" fill="#425466">25</text>
+<text x="1500.9" y="382.0" transform="rotate(60 1500.9,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux_basslowflux</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux_bassharmonic&#10;best_downbeat_f1=0.4406&#10;completed_at~2026-03-14 14:46:30 UTC</title>
+<rect x="1552.6" y="91.8" width="24" height="258.2" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1564.6" cy="91.8" r="3.5" fill="#1f5f99"/>
+<text x="1564.6" y="368.0" text-anchor="middle" font-size="11" fill="#425466">26</text>
+<text x="1560.6" y="382.0" transform="rotate(60 1560.6,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux_bassharmonic</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux_pianoaux&#10;best_downbeat_f1=0.4440&#10;completed_at~2026-03-14 16:06:07 UTC</title>
+<rect x="1612.3" y="88.1" width="24" height="261.9" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1624.3" cy="88.1" r="3.5" fill="#1f5f99"/>
+<text x="1624.3" y="368.0" text-anchor="middle" font-size="11" fill="#425466">27</text>
+<text x="1620.3" y="382.0" transform="rotate(60 1620.3,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux_pianoaux</text>
+</g>
+<g>
+<title>exp_chord_preinit_stemdrop2_drumaux_highfreq&#10;best_downbeat_f1=0.4642&#10;completed_at~2026-03-15 03:28:47 UTC</title>
+<rect x="1672.0" y="66.4" width="24" height="283.6" fill="#8fb8de" opacity="0.85"/>
+<circle cx="1684.0" cy="66.4" r="3.5" fill="#1f5f99"/>
+<text x="1684.0" y="368.0" text-anchor="middle" font-size="11" fill="#425466">28</text>
+<text x="1680.0" y="382.0" transform="rotate(60 1680.0,382.0)" font-size="11" fill="#425466">exp_chord_preinit_stemdrop2_drumaux_highfreq</text>
+</g>
+<path d="M 72.0,227.5 L 131.7,202.9 L 191.4,202.9 L 251.1,188.1 L 310.8,188.1 L 370.5,145.7 L 430.2,145.7 L 489.9,145.7 L 549.6,145.7 L 609.3,145.7 L 669.0,145.7 L 728.7,145.7 L 788.4,145.7 L 848.1,145.7 L 907.9,145.7 L 967.6,145.7 L 1027.3,145.7 L 1087.0,145.7 L 1146.7,84.8 L 1206.4,79.7 L 1266.1,79.7 L 1325.8,79.7 L 1385.5,71.1 L 1445.2,71.1 L 1504.9,71.1 L 1564.6,71.1 L 1624.3,71.1 L 1684.0,66.4" fill="none" stroke="#d94841" stroke-width="2.5"/>
+<circle cx="72" cy="490" r="5" fill="#8fb8de"/>
+<text x="84" y="494" font-size="12" fill="#425466">best_downbeat_f1 per run</text>
+<line x1="242" y1="490" x2="266" y2="490" stroke="#d94841" stroke-width="2.5"/>
+<text x="274" y="494" font-size="12" fill="#425466">running best</text>
+</svg>

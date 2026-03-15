@@ -1,8 +1,14 @@
 # Experiment Summary
 
-Generated: 2026-03-15 03:29:34 UTC
+Generated: 2026-03-15 03:34:16 UTC
 
 Runs: 28
+
+## Progress
+
+Completion order is estimated from `history.jsonl` / `config.json` modification times.
+
+![Downbeat Progress](experiment_progress_downbeat.svg)
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | stem_drop | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

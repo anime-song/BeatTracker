@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +45,7 @@ class ExperimentSummary:
     git_branch: Optional[str]
     git_commit: Optional[str]
     git_dirty: Optional[bool]
+    completed_timestamp: Optional[float]
 
     @property
     def model_tag(self) -> str:
@@ -92,6 +95,7 @@ class ExperimentSummary:
             "git_branch": self.git_branch or "",
             "git_commit": self.git_commit or "",
             "git_dirty": "" if self.git_dirty is None else str(self.git_dirty).lower(),
+            "completed_at": _format_timestamp(self.completed_timestamp),
             "run_path": self.run_path,
         }
 
@@ -172,6 +176,14 @@ def _format_float(value: Optional[float], digits: int = 4) -> str:
     return "" if value is None else f"{value:.{digits}f}"
 
 
+def _format_timestamp(value: Optional[float]) -> str:
+    if value is None:
+        return ""
+    return datetime.fromtimestamp(value, tz=timezone.utc).strftime(
+        "%Y-%m-%d %H:%M:%S UTC"
+    )
+
+
 def _derive_status(configured_epochs: Optional[int], last_epoch: Optional[int]) -> str:
     if last_epoch is None:
         return "no_history"
@@ -220,6 +232,10 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
 
     configured_epochs = _as_int(config.get("epochs"))
     last_epoch = _as_int(last_entry.get("epoch")) if last_entry else None
+    completed_timestamp = max(
+        (path.stat().st_mtime for path in (config_path, history_path) if path.exists()),
+        default=None,
+    )
 
     return ExperimentSummary(
         run_name=run_dir.name,
@@ -258,6 +274,7 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         git_branch=str(config["git_branch"]) if config.get("git_branch") else None,
         git_commit=str(config["git_commit"]) if config.get("git_commit") else None,
         git_dirty=_as_bool(config.get("git_dirty")),
+        completed_timestamp=completed_timestamp,
     )
 
 
@@ -319,6 +336,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "git_branch",
         "git_commit",
         "git_dirty",
+        "completed_at",
         "run_path",
     ]
     with csv_path.open("w", encoding="utf-8", newline="") as fp:
@@ -335,6 +353,152 @@ def _markdown_table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join([header_line, separator_line, *body_lines])
 
 
+def _completion_order(summaries: list[ExperimentSummary]) -> list[ExperimentSummary]:
+    return sorted(
+        summaries,
+        key=lambda item: (
+            item.completed_timestamp is None,
+            item.completed_timestamp or float("inf"),
+            item.run_name,
+        ),
+    )
+
+
+def _write_progress_svg(svg_path: Path, summaries: list[ExperimentSummary]) -> None:
+    ordered = [
+        summary
+        for summary in _completion_order(summaries)
+        if summary.best_downbeat_f1 is not None
+    ]
+    if not ordered:
+        return
+
+    svg_path.parent.mkdir(parents=True, exist_ok=True)
+
+    width = max(960, 140 + len(ordered) * 56)
+    height = 520
+    left = 72
+    right = 24
+    top = 28
+    bottom = 170
+    plot_width = width - left - right
+    plot_height = height - top - bottom
+
+    scores = [float(summary.best_downbeat_f1) for summary in ordered]
+    y_min = max(0.0, math.floor((min(scores) - 0.02) * 20.0) / 20.0)
+    y_max = min(1.0, math.ceil((max(scores) + 0.02) * 20.0) / 20.0)
+    if y_max - y_min < 0.1:
+        y_max = min(1.0, y_min + 0.1)
+
+    def x_pos(index: int) -> float:
+        if len(ordered) == 1:
+            return left + plot_width / 2.0
+        return left + (plot_width * index / (len(ordered) - 1))
+
+    def y_pos(score: float) -> float:
+        ratio = (score - y_min) / max(1e-8, (y_max - y_min))
+        return top + plot_height - (ratio * plot_height)
+
+    grid_lines: list[str] = []
+    for step in range(6):
+        value = y_min + (y_max - y_min) * step / 5.0
+        y = y_pos(value)
+        grid_lines.append(
+            f'<line x1="{left}" y1="{y:.1f}" x2="{left + plot_width}" y2="{y:.1f}" '
+            'stroke="#d7dce2" stroke-width="1"/>'
+        )
+        grid_lines.append(
+            f'<text x="{left - 10}" y="{y + 4:.1f}" text-anchor="end" '
+            'font-size="12" fill="#425466">'
+            f"{value:.3f}</text>"
+        )
+
+    bars: list[str] = []
+    running_line_points: list[str] = []
+    running_best = -1.0
+    completion_rows: list[list[str]] = []
+
+    for index, summary in enumerate(ordered, start=1):
+        assert summary.best_downbeat_f1 is not None
+        score = float(summary.best_downbeat_f1)
+        running_best = max(running_best, score)
+        x = x_pos(index - 1)
+        y = y_pos(score)
+        bar_top = y
+        bar_height = top + plot_height - bar_top
+        bars.append(
+            "\n".join(
+                [
+                    f'<g>',
+                    f'<title>{html.escape(summary.run_name)}&#10;best_downbeat_f1={score:.4f}'
+                    f'&#10;completed_at~{html.escape(_format_timestamp(summary.completed_timestamp) or "-")}</title>',
+                    f'<rect x="{x - 12:.1f}" y="{bar_top:.1f}" width="24" height="{bar_height:.1f}" '
+                    'fill="#8fb8de" opacity="0.85"/>',
+                    f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="#1f5f99"/>',
+                    f'<text x="{x:.1f}" y="{top + plot_height + 18:.1f}" text-anchor="middle" '
+                    'font-size="11" fill="#425466">'
+                    f"{index}</text>",
+                    f'<text x="{x - 4:.1f}" y="{top + plot_height + 32:.1f}" '
+                    f'transform="rotate(60 {x - 4:.1f},{top + plot_height + 32:.1f})" '
+                    'font-size="11" fill="#425466">'
+                    f"{html.escape(summary.run_name)}</text>",
+                    "</g>",
+                ]
+            )
+        )
+        running_line_points.append(f"{x:.1f},{y_pos(running_best):.1f}")
+        completion_rows.append(
+            [
+                str(index),
+                summary.run_name,
+                _format_timestamp(summary.completed_timestamp) or "-",
+                f"{score:.4f}",
+                f"{running_best:.4f}",
+            ]
+        )
+
+    path_d = " ".join(
+        (
+            [f"M {running_line_points[0]}"]
+            + [f"L {point}" for point in running_line_points[1:]]
+        )
+    )
+    legend_y = height - 26
+    svg = "\n".join(
+        [
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+            '<rect width="100%" height="100%" fill="#f7f9fc"/>',
+            '<text x="24" y="22" font-size="18" font-weight="700" fill="#15212b">Best Downbeat F1 Progress</text>',
+            '<text x="24" y="42" font-size="12" fill="#425466">x-axis is estimated completion order from history/config file timestamps.</text>',
+            *grid_lines,
+            f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_height}" stroke="#425466" stroke-width="1.2"/>',
+            f'<line x1="{left}" y1="{top + plot_height}" x2="{left + plot_width}" y2="{top + plot_height}" stroke="#425466" stroke-width="1.2"/>',
+            *bars,
+            f'<path d="{path_d}" fill="none" stroke="#d94841" stroke-width="2.5"/>',
+            f'<circle cx="{left}" cy="{legend_y - 4}" r="5" fill="#8fb8de"/>',
+            f'<text x="{left + 12}" y="{legend_y}" font-size="12" fill="#425466">best_downbeat_f1 per run</text>',
+            f'<line x1="{left + 170}" y1="{legend_y - 4}" x2="{left + 194}" y2="{legend_y - 4}" stroke="#d94841" stroke-width="2.5"/>',
+            f'<text x="{left + 202}" y="{legend_y}" font-size="12" fill="#425466">running best</text>',
+            "</svg>",
+        ]
+    )
+    svg_path.write_text(svg, encoding="utf-8")
+
+    table_path = svg_path.with_suffix(".csv")
+    with table_path.open("w", encoding="utf-8", newline="") as fp:
+        writer = csv.writer(fp)
+        writer.writerow(
+            [
+                "completion_order",
+                "run_name",
+                "completed_at_estimated",
+                "best_downbeat_f1",
+                "running_best_downbeat_f1",
+            ]
+        )
+        writer.writerows(completion_rows)
+
+
 def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> None:
     markdown_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -347,6 +511,17 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
         f"Runs: {len(summaries)}",
         "",
     ]
+    progress_svg_name = "experiment_progress_downbeat.svg"
+    lines.extend(
+        [
+            "## Progress",
+            "",
+            "Completion order is estimated from `history.jsonl` / `config.json` modification times.",
+            "",
+            f"![Downbeat Progress]({progress_svg_name})",
+            "",
+        ]
+    )
 
     overview_rows = [
         [
@@ -485,10 +660,15 @@ def main() -> None:
     summaries = collect_summaries(args.outputs_root)
     write_csv(args.csv_path, summaries)
     write_markdown(args.markdown_path, summaries)
+    _write_progress_svg(args.markdown_path.with_name("experiment_progress_downbeat.svg"), summaries)
 
     print(f"runs={len(summaries)}")
     print(f"csv={args.csv_path}")
     print(f"markdown={args.markdown_path}")
+    print(
+        "progress_svg="
+        f"{args.markdown_path.with_name('experiment_progress_downbeat.svg')}"
+    )
 
 
 if __name__ == "__main__":
