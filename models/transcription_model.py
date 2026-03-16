@@ -452,6 +452,37 @@ class DrumAuxHead(nn.Module):
         return broadband_flux_logits, onset_env_logits, high_frequency_flux_logits
 
 
+class RhythmMeterHead(nn.Module):
+    """
+    予測した beat / downbeat の並びから meter を読む小さな head。
+
+    GT downbeat で切った bar ごとの 2ch 系列を受け取り、
+    そこから meter class を予測する。
+    """
+
+    def __init__(
+        self,
+        num_meter_classes: int,
+        hidden_channels: int = 32,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv1d(2, hidden_channels, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Conv1d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        self.output = nn.Linear(hidden_channels, num_meter_classes)
+
+    def forward(self, rhythm_features: torch.Tensor) -> torch.Tensor:
+        x = self.net(rhythm_features)
+        x = x.mean(dim=-1)
+        return self.output(x)
+
+
 class BeatDownbeatHead(nn.Module):
     """
     Backbone が出力したフレーム特徴から beat / downbeat / meter のロジットを生成するヘッド。
@@ -525,6 +556,7 @@ class BeatTranscriptionModel(nn.Module):
         num_meter_classes: int,
         use_drum_aux_head: bool = False,
         use_drum_high_frequency_flux: bool = False,
+        use_meter_from_rhythm_head: bool = False,
         head_dropout: float = 0.0,
     ):
         super().__init__()
@@ -535,6 +567,15 @@ class BeatTranscriptionModel(nn.Module):
             use_drum_aux_head=use_drum_aux_head,
             use_drum_high_frequency_flux=use_drum_high_frequency_flux,
             dropout=head_dropout,
+        )
+        self.rhythm_meter_head = (
+            RhythmMeterHead(
+                num_meter_classes=num_meter_classes,
+                hidden_channels=max(16, backbone.output_dim // 8),
+                dropout=head_dropout,
+            )
+            if use_meter_from_rhythm_head
+            else None
         )
 
     def forward(

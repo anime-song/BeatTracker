@@ -93,6 +93,77 @@ def masked_index_pair_l1_loss(
     return weighted.sum() / normalizer
 
 
+def build_meter_from_rhythm_examples(
+    beat_logits: torch.Tensor,
+    downbeat_logits: torch.Tensor,
+    downbeat_targets: torch.Tensor,
+    meter_targets: torch.Tensor,
+    valid_mask: torch.Tensor,
+    sample_length: int,
+    ignore_index: int = -100,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    GT downbeat 区間ごとに、beat/downbeat の予測系列を固定長へ補間して
+    meter classification 用のサンプルを作る。
+    """
+    beat_probabilities = torch.sigmoid(beat_logits)
+    downbeat_probabilities = torch.sigmoid(downbeat_logits)
+
+    interval_features: list[torch.Tensor] = []
+    interval_targets: list[int] = []
+
+    batch_size = beat_logits.shape[0]
+    for batch_index in range(batch_size):
+        sample_valid = valid_mask[batch_index] > 0.5
+        event_indices = torch.nonzero(
+            (downbeat_targets[batch_index] > 0.5) & sample_valid,
+            as_tuple=False,
+        ).flatten()
+        if event_indices.numel() < 2:
+            continue
+
+        for start_frame, end_frame in zip(
+            event_indices[:-1].tolist(),
+            event_indices[1:].tolist(),
+        ):
+            if end_frame <= start_frame:
+                continue
+
+            interval_meter_targets = meter_targets[batch_index, start_frame:end_frame]
+            interval_meter_targets = interval_meter_targets[
+                interval_meter_targets != int(ignore_index)
+            ]
+            if interval_meter_targets.numel() == 0:
+                continue
+
+            target_class = int(interval_meter_targets[0].item())
+            interval_sequence = torch.stack(
+                [
+                    beat_probabilities[batch_index, start_frame:end_frame],
+                    downbeat_probabilities[batch_index, start_frame:end_frame],
+                ],
+                dim=0,
+            ).unsqueeze(0)
+            resized_sequence = F.interpolate(
+                interval_sequence,
+                size=sample_length,
+                mode="linear",
+                align_corners=False,
+            ).squeeze(0)
+            interval_features.append(resized_sequence)
+            interval_targets.append(target_class)
+
+    if not interval_features:
+        empty_features = beat_logits.new_zeros((0, 2, sample_length))
+        empty_targets = meter_targets.new_zeros((0,), dtype=torch.long)
+        return empty_features, empty_targets
+
+    return (
+        torch.stack(interval_features, dim=0),
+        torch.tensor(interval_targets, dtype=torch.long, device=beat_logits.device),
+    )
+
+
 # https://github.com/CPJKU/beat_this/blob/main/beat_this/model/loss.py
 class ShiftTolerantBCELoss(torch.nn.Module):
     """

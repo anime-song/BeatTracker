@@ -29,6 +29,7 @@ class ExperimentSummary:
     train_samples_per_epoch: Optional[int]
     segment_seconds: Optional[float]
     meter_loss_weight: Optional[float]
+    meter_from_rhythm_loss_weight: Optional[float]
     drum_aux_loss_weight: Optional[float]
     drum_aux_use_high_frequency_flux: Optional[bool]
     repeat_consistency_loss_weight: Optional[float]
@@ -81,6 +82,9 @@ class ExperimentSummary:
             "train_samples_per_epoch": _format_int(self.train_samples_per_epoch),
             "segment_seconds": _format_float(self.segment_seconds, digits=1),
             "meter_loss_weight": _format_float(self.meter_loss_weight, digits=3),
+            "meter_from_rhythm_loss_weight": _format_float(
+                self.meter_from_rhythm_loss_weight, digits=3
+            ),
             "drum_aux_loss_weight": _format_float(self.drum_aux_loss_weight, digits=3),
             "drum_aux_use_high_frequency_flux": ""
             if self.drum_aux_use_high_frequency_flux is None
@@ -279,6 +283,9 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
         train_samples_per_epoch=_as_int(config.get("train_samples_per_epoch")),
         segment_seconds=_as_float(config.get("segment_seconds")),
         meter_loss_weight=_as_float(config.get("meter_loss_weight")),
+        meter_from_rhythm_loss_weight=_as_float(
+            config.get("meter_from_rhythm_loss_weight")
+        ),
         drum_aux_loss_weight=_as_float(config.get("drum_aux_loss_weight")),
         drum_aux_use_high_frequency_flux=_as_bool(
             config.get("drum_aux_use_high_frequency_flux")
@@ -357,6 +364,7 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "train_samples_per_epoch",
         "segment_seconds",
         "meter_loss_weight",
+        "meter_from_rhythm_loss_weight",
         "drum_aux_loss_weight",
         "drum_aux_use_high_frequency_flux",
         "repeat_consistency_loss_weight",
@@ -578,6 +586,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             _format_float(summary.lr, digits=6) or "-",
             _format_int(summary.batch_size) or "-",
             _format_float(summary.meter_loss_weight, digits=3) or "-",
+            _format_float(summary.meter_from_rhythm_loss_weight, digits=3) or "-",
             _format_float(summary.drum_aux_loss_weight, digits=3) or "-",
             "-"
             if summary.drum_aux_use_high_frequency_flux is None
@@ -608,6 +617,7 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "lr",
                 "batch",
                 "meter_w",
+                "rhythm_meter_w",
                 "drum_aux_w",
                 "drum_hf",
                 "repeat_w",
@@ -661,6 +671,13 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         [
                             "meter_loss_weight",
                             _format_float(summary.meter_loss_weight, digits=3) or "-",
+                        ],
+                        [
+                            "meter_from_rhythm_loss_weight",
+                            _format_float(
+                                summary.meter_from_rhythm_loss_weight, digits=3
+                            )
+                            or "-",
                         ],
                         [
                             "drum_aux_loss_weight",

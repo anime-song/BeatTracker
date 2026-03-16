@@ -15,6 +15,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 from tqdm.auto import tqdm
@@ -36,6 +37,7 @@ from training.augmentations import apply_ranked_stem_dropout
 from training.losses import (
     BalancedSoftmaxLoss,
     ShiftTolerantBCELoss,
+    build_meter_from_rhythm_examples,
     masked_index_pair_l1_loss,
     masked_l1_loss,
 )
@@ -255,6 +257,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--beat-pos-weight", type=float, default=5.0)
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
     parser.add_argument("--meter-loss-weight", type=float, default=0.05)
+    parser.add_argument(
+        "--meter-from-rhythm-loss-weight",
+        type=float,
+        default=0.05,
+        help="GT downbeat 区間の beat/downbeat 予測系列から meter を読む補助 loss の重み。",
+    )
+    parser.add_argument(
+        "--meter-from-rhythm-sample-length",
+        type=int,
+        default=32,
+        help="1 bar の beat/downbeat 予測系列を meter-from-rhythm head へ入れる前に補間する長さ。",
+    )
     parser.add_argument(
         "--drum-aux-loss-weight",
         type=float,
@@ -543,6 +557,7 @@ def build_model(
         num_meter_classes=train_dataset.num_meter_classes,
         use_drum_aux_head=args.drum_aux_loss_weight > 0.0,
         use_drum_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
+        use_meter_from_rhythm_head=args.meter_from_rhythm_loss_weight > 0.0,
         head_dropout=args.head_dropout,
     )
 
@@ -728,12 +743,15 @@ def load_resume_state(
 
 
 def compute_loss(
+    model: BeatTranscriptionModel,
     output,
     batch: dict,
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    meter_from_rhythm_loss_weight: float,
+    meter_from_rhythm_sample_length: int,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     repeat_consistency_loss_weight: float,
@@ -764,6 +782,39 @@ def compute_loss(
         )
     else:
         meter_accuracy = 0.0
+
+    raw_meter_from_rhythm_loss = beat_loss.new_tensor(0.0)
+    meter_from_rhythm_accuracy = 0.0
+    meter_from_rhythm_interval_count = 0.0
+    if meter_from_rhythm_loss_weight > 0.0:
+        if model.rhythm_meter_head is None:
+            raise ValueError("Model must include rhythm_meter_head")
+
+        rhythm_features, rhythm_targets = build_meter_from_rhythm_examples(
+            beat_logits=output.beat_logits,
+            downbeat_logits=output.downbeat_logits,
+            downbeat_targets=batch["downbeat_targets"],
+            meter_targets=batch["meter_targets"],
+            valid_mask=batch["valid_mask"],
+            sample_length=meter_from_rhythm_sample_length,
+            ignore_index=meter_loss_fn.ignore_index,
+        )
+        meter_from_rhythm_interval_count = float(rhythm_targets.numel())
+        if rhythm_targets.numel() > 0:
+            rhythm_logits = model.rhythm_meter_head(rhythm_features)
+            raw_meter_from_rhythm_loss = F.cross_entropy(
+                rhythm_logits,
+                rhythm_targets,
+            )
+            meter_from_rhythm_accuracy = float(
+                (rhythm_logits.argmax(dim=-1) == rhythm_targets)
+                .float()
+                .mean()
+                .detach()
+            )
+    meter_from_rhythm_loss = (
+        raw_meter_from_rhythm_loss * meter_from_rhythm_loss_weight
+    )
 
     raw_drum_aux_loss = beat_loss.new_tensor(0.0)
     broadband_flux_loss = beat_loss.new_tensor(0.0)
@@ -822,7 +873,12 @@ def compute_loss(
 
     # 補助タスクは meter / drum aux / repeat consistency を足す。
     total_loss = (
-        beat_loss + downbeat_loss + meter_loss + drum_aux_loss + repeat_consistency_loss
+        beat_loss
+        + downbeat_loss
+        + meter_loss
+        + meter_from_rhythm_loss
+        + drum_aux_loss
+        + repeat_consistency_loss
     )
     return total_loss, {
         "loss": float(total_loss.detach()),
@@ -831,6 +887,10 @@ def compute_loss(
         "meter_loss": float(meter_loss.detach()),
         "raw_meter_loss": float(raw_meter_loss.detach()),
         "meter_accuracy": meter_accuracy,
+        "meter_from_rhythm_loss": float(meter_from_rhythm_loss.detach()),
+        "raw_meter_from_rhythm_loss": float(raw_meter_from_rhythm_loss.detach()),
+        "meter_from_rhythm_accuracy": meter_from_rhythm_accuracy,
+        "meter_from_rhythm_interval_count": meter_from_rhythm_interval_count,
         "drum_aux_loss": float(drum_aux_loss.detach()),
         "raw_drum_aux_loss": float(raw_drum_aux_loss.detach()),
         "broadband_flux_loss": float(broadband_flux_loss.detach()),
@@ -939,6 +999,8 @@ def train_one_epoch(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    meter_from_rhythm_loss_weight: float,
+    meter_from_rhythm_sample_length: int,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     repeat_consistency_loss_weight: float,
@@ -981,12 +1043,15 @@ def train_one_epoch(
         ):
             output = model(batch["waveform"])
             loss, loss_info = compute_loss(
+                model,
                 output,
                 batch,
                 beat_loss_fn,
                 downbeat_loss_fn,
                 meter_loss_fn,
                 meter_loss_weight,
+                meter_from_rhythm_loss_weight,
+                meter_from_rhythm_sample_length,
                 drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux,
                 repeat_consistency_loss_weight,
@@ -1037,6 +1102,26 @@ def train_one_epoch(
             writer.add_scalar(
                 "train_step/raw_meter_loss",
                 loss_info["raw_meter_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/meter_from_rhythm_loss",
+                loss_info["meter_from_rhythm_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_meter_from_rhythm_loss",
+                loss_info["raw_meter_from_rhythm_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/meter_from_rhythm_accuracy",
+                loss_info["meter_from_rhythm_accuracy"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/meter_from_rhythm_interval_count",
+                loss_info["meter_from_rhythm_interval_count"],
                 global_step,
             )
             writer.add_scalar(
@@ -1094,6 +1179,7 @@ def train_one_epoch(
                 beat=f"{loss_info['beat_loss']:.4f}",
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
+                rhythm_meter=f"{loss_info['meter_from_rhythm_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
                 repeat=f"{loss_info['repeat_consistency_loss']:.4f}",
             )
@@ -1109,6 +1195,8 @@ def validate(
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
     meter_loss_weight: float,
+    meter_from_rhythm_loss_weight: float,
+    meter_from_rhythm_sample_length: int,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     repeat_consistency_loss_weight: float,
@@ -1149,12 +1237,15 @@ def validate(
         batch = move_batch_to_device(batch, device)
         output = model(batch["waveform"])
         _, loss_info = compute_loss(
+            model,
             output,
             batch,
             beat_loss_fn,
             downbeat_loss_fn,
             meter_loss_fn,
             meter_loss_weight,
+            meter_from_rhythm_loss_weight,
+            meter_from_rhythm_sample_length,
             drum_aux_loss_weight,
             drum_aux_use_high_frequency_flux,
             repeat_consistency_loss_weight,
@@ -1317,6 +1408,10 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "meter_loss",
         "raw_meter_loss",
         "meter_accuracy",
+        "meter_from_rhythm_loss",
+        "raw_meter_from_rhythm_loss",
+        "meter_from_rhythm_accuracy",
+        "meter_from_rhythm_interval_count",
         "drum_aux_loss",
         "raw_drum_aux_loss",
         "broadband_flux_loss",
@@ -1423,6 +1518,7 @@ def main() -> None:
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
             "drum_aux_use_high_frequency_flux": args.drum_aux_use_high_frequency_flux,
+            "use_meter_from_rhythm_head": args.meter_from_rhythm_loss_weight > 0.0,
             "repeat_consistency_loss_weight": args.repeat_consistency_loss_weight,
             "init_state_source": None
             if init_info is None
@@ -1448,6 +1544,8 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(f"meter_from_rhythm_loss_weight={args.meter_from_rhythm_loss_weight}")
+    print(f"meter_from_rhythm_sample_length={args.meter_from_rhythm_sample_length}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(
         "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
@@ -1498,6 +1596,8 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                meter_from_rhythm_loss_weight=args.meter_from_rhythm_loss_weight,
+                meter_from_rhythm_sample_length=args.meter_from_rhythm_sample_length,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 repeat_consistency_loss_weight=args.repeat_consistency_loss_weight,
@@ -1519,6 +1619,8 @@ def main() -> None:
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                meter_from_rhythm_loss_weight=args.meter_from_rhythm_loss_weight,
+                meter_from_rhythm_sample_length=args.meter_from_rhythm_sample_length,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 repeat_consistency_loss_weight=args.repeat_consistency_loss_weight,

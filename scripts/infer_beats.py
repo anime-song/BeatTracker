@@ -218,6 +218,18 @@ def infer_use_drum_high_frequency_flux(
     )
 
 
+def infer_use_meter_from_rhythm_head(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> bool:
+    if "use_meter_from_rhythm_head" in config:
+        return bool(config["use_meter_from_rhythm_head"])
+    if "meter_from_rhythm_loss_weight" in config:
+        return float(config["meter_from_rhythm_loss_weight"]) > 0.0
+
+    return any(key.startswith("rhythm_meter_head.") for key in state_dict.keys())
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -488,6 +500,7 @@ def build_model_from_config(
     num_meter_classes: int,
     use_drum_aux_head: bool,
     use_drum_high_frequency_flux: bool,
+    use_meter_from_rhythm_head: bool,
 ) -> BeatTranscriptionModel:
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=int(config["sample_rate"]),
@@ -512,6 +525,7 @@ def build_model_from_config(
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
         use_drum_high_frequency_flux=use_drum_high_frequency_flux,
+        use_meter_from_rhythm_head=use_meter_from_rhythm_head,
         head_dropout=float(config.get("head_dropout", 0.0)),
     )
 
@@ -920,6 +934,9 @@ def main() -> None:
     use_drum_high_frequency_flux = infer_use_drum_high_frequency_flux(
         state_dict, config
     )
+    use_meter_from_rhythm_head = infer_use_meter_from_rhythm_head(
+        state_dict, config
+    )
     model = build_model_from_config(
         config=config,
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
@@ -927,6 +944,7 @@ def main() -> None:
         num_meter_classes=num_meter_classes,
         use_drum_aux_head=use_drum_aux_head,
         use_drum_high_frequency_flux=use_drum_high_frequency_flux,
+        use_meter_from_rhythm_head=use_meter_from_rhythm_head,
     )
     model.load_state_dict(state_dict, strict=True)
 
