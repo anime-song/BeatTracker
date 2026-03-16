@@ -265,6 +265,16 @@ def parse_args() -> argparse.Namespace:
         default=4,
         help="train 時にエネルギーの小さい stem から最大何本まで落とすか。0 で無効。",
     )
+    parser.add_argument(
+        "--stem-dropout-prioritize-drums",
+        action="store_true",
+        help="stem dropout で 1 本以上落とすとき、drums stem を優先的に落とす。",
+    )
+    parser.add_argument(
+        "--mask-drum-aux-when-drums-dropped",
+        action="store_true",
+        help="drums stem が dropout されたサンプルでは drum aux loss を無効にする。",
+    )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
     parser.add_argument("--mir-eval-trim-beats-before-sec", type=float, default=5.0)
@@ -851,6 +861,8 @@ def train_one_epoch(
     num_stems: int,
     drums_stem_index: int,
     stem_dropout_max_count: int,
+    stem_dropout_prioritize_drums: bool,
+    mask_drum_aux_when_drums_dropped: bool,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -874,20 +886,25 @@ def train_one_epoch(
         batch["drum_aux_valid_mask"] = batch["valid_mask"]
 
         dropped_stem_count = 0.0
+        drums_dropped_fraction = 0.0
         drum_aux_masked_fraction = 0.0
         if stem_dropout_max_count > 0:
             batch["waveform"], dropped_counts, drop_mask = apply_ranked_stem_dropout(
                 batch["waveform"],
                 num_stems=num_stems,
                 max_dropout_stems=stem_dropout_max_count,
+                prioritized_stem_index=(
+                    drums_stem_index if stem_dropout_prioritize_drums else None
+                ),
             )
             dropped_stem_count = float(dropped_counts.float().mean().item())
             drums_dropped = drop_mask[:, drums_stem_index]
-            drum_aux_masked_fraction = float(drums_dropped.float().mean().item())
-            if bool(drums_dropped.any()):
+            drums_dropped_fraction = float(drums_dropped.float().mean().item())
+            if mask_drum_aux_when_drums_dropped and bool(drums_dropped.any()):
                 drum_aux_valid_mask = batch["valid_mask"].clone()
                 drum_aux_valid_mask[drums_dropped] = 0.0
                 batch["drum_aux_valid_mask"] = drum_aux_valid_mask
+                drum_aux_masked_fraction = drums_dropped_fraction
 
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
@@ -906,6 +923,7 @@ def train_one_epoch(
                 drum_aux_use_high_frequency_flux,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
+            loss_info["drums_dropped_fraction"] = drums_dropped_fraction
             loss_info["drum_aux_masked_fraction"] = drum_aux_masked_fraction
 
         if scaler.is_enabled():
@@ -985,6 +1003,11 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/drums_dropped_fraction",
+                loss_info["drums_dropped_fraction"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/drum_aux_masked_fraction",
                 loss_info["drum_aux_masked_fraction"],
                 global_step,
@@ -1000,6 +1023,7 @@ def train_one_epoch(
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
+                drums_drop=f"{loss_info['drums_dropped_fraction']:.2f}",
                 drum_mask=f"{loss_info['drum_aux_masked_fraction']:.2f}",
             )
 
@@ -1226,6 +1250,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "onset_env_loss",
         "high_frequency_flux_loss",
         "stem_dropout_count",
+        "drums_dropped_fraction",
         "drum_aux_masked_fraction",
         "beat_precision",
         "beat_recall",
@@ -1380,6 +1405,12 @@ def main() -> None:
         f"file_handle_cache={not args.disable_file_handle_cache}, "
         f"max_open_files={args.max_open_files}"
     )
+    print(
+        "stem_dropout="
+        f"max_count={args.stem_dropout_max_count}, "
+        f"prioritize_drums={args.stem_dropout_prioritize_drums}, "
+        f"mask_drum_aux_when_drums_dropped={args.mask_drum_aux_when_drums_dropped}"
+    )
 
     try:
         for epoch in range(start_epoch, args.epochs + 1):
@@ -1399,6 +1430,8 @@ def main() -> None:
                 num_stems=len(train_dataset.stem_names),
                 drums_stem_index=drums_stem_index,
                 stem_dropout_max_count=args.stem_dropout_max_count,
+                stem_dropout_prioritize_drums=args.stem_dropout_prioritize_drums,
+                mask_drum_aux_when_drums_dropped=args.mask_drum_aux_when_drums_dropped,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,

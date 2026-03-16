@@ -30,6 +30,8 @@ class ExperimentSummary:
     drum_aux_loss_weight: Optional[float]
     drum_aux_use_high_frequency_flux: Optional[bool]
     stem_dropout_max_count: Optional[int]
+    stem_dropout_prioritize_drums: Optional[bool]
+    mask_drum_aux_when_drums_dropped: Optional[bool]
     init_scope: Optional[str]
     init_from: Optional[str]
     init_state_source: Optional[str]
@@ -79,6 +81,12 @@ class ExperimentSummary:
             if self.drum_aux_use_high_frequency_flux is None
             else str(self.drum_aux_use_high_frequency_flux).lower(),
             "stem_dropout_max_count": _format_int(self.stem_dropout_max_count),
+            "stem_dropout_prioritize_drums": ""
+            if self.stem_dropout_prioritize_drums is None
+            else str(self.stem_dropout_prioritize_drums).lower(),
+            "mask_drum_aux_when_drums_dropped": ""
+            if self.mask_drum_aux_when_drums_dropped is None
+            else str(self.mask_drum_aux_when_drums_dropped).lower(),
             "init_scope": self.init_scope or "",
             "init_from": self.init_from or "",
             "init_state_source": self.init_state_source or "",
@@ -243,6 +251,12 @@ def _build_summary(run_dir: Path) -> Optional[ExperimentSummary]:
             config.get("drum_aux_use_high_frequency_flux")
         ),
         stem_dropout_max_count=_as_int(config.get("stem_dropout_max_count")),
+        stem_dropout_prioritize_drums=_as_bool(
+            config.get("stem_dropout_prioritize_drums")
+        ),
+        mask_drum_aux_when_drums_dropped=_as_bool(
+            config.get("mask_drum_aux_when_drums_dropped")
+        ),
         init_scope=str(config["init_scope"]) if config.get("init_scope") else None,
         init_from=str(config["init_from"]) if config.get("init_from") else None,
         init_state_source=str(config["init_state_source"])
@@ -306,6 +320,8 @@ def write_csv(csv_path: Path, summaries: list[ExperimentSummary]) -> None:
         "drum_aux_loss_weight",
         "drum_aux_use_high_frequency_flux",
         "stem_dropout_max_count",
+        "stem_dropout_prioritize_drums",
+        "mask_drum_aux_when_drums_dropped",
         "init_scope",
         "init_from",
         "init_state_source",
@@ -365,6 +381,12 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
             if summary.drum_aux_use_high_frequency_flux is None
             else str(summary.drum_aux_use_high_frequency_flux).lower(),
             _format_int(summary.stem_dropout_max_count) or "-",
+            "-"
+            if summary.stem_dropout_prioritize_drums is None
+            else str(summary.stem_dropout_prioritize_drums).lower(),
+            "-"
+            if summary.mask_drum_aux_when_drums_dropped is None
+            else str(summary.mask_drum_aux_when_drums_dropped).lower(),
             (
                 summary.init_scope
                 if summary.init_state_source is None
@@ -392,6 +414,8 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                 "drum_aux_w",
                 "drum_hf",
                 "stem_drop",
+                "drop_drums",
+                "mask_drum_aux",
                 "init",
                 "model",
                 "branch",
@@ -456,6 +480,18 @@ def write_markdown(markdown_path: Path, summaries: list[ExperimentSummary]) -> N
                         [
                             "stem_dropout_max_count",
                             _format_int(summary.stem_dropout_max_count) or "-",
+                        ],
+                        [
+                            "stem_dropout_prioritize_drums",
+                            "-"
+                            if summary.stem_dropout_prioritize_drums is None
+                            else str(summary.stem_dropout_prioritize_drums).lower(),
+                        ],
+                        [
+                            "mask_drum_aux_when_drums_dropped",
+                            "-"
+                            if summary.mask_drum_aux_when_drums_dropped is None
+                            else str(summary.mask_drum_aux_when_drums_dropped).lower(),
                         ],
                         ["init_scope", summary.init_scope or "-"],
                         ["init_from", summary.init_from or "-"],

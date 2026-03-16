@@ -9,6 +9,7 @@ def apply_ranked_stem_dropout(
     waveform: torch.Tensor,
     num_stems: int,
     max_dropout_stems: int,
+    prioritized_stem_index: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     stem ごとのエネルギーを見て、弱い stem から順にランダム本数だけ落とす。
@@ -40,6 +41,20 @@ def apply_ranked_stem_dropout(
     # stereo をまとめた平均二乗エネルギーで stem を並べる。
     stem_energy = stem_waveform.square().mean(dim=(2, 3))
     energy_rank = torch.argsort(stem_energy, dim=1, descending=False)
+
+    # 実験用に特定 stem を優先的に落としたいときは、
+    # エネルギー順位の先頭へ寄せて「1本以上落とすならまずそこから」にする。
+    if prioritized_stem_index is not None:
+        if not (0 <= prioritized_stem_index < num_stems):
+            raise ValueError("prioritized_stem_index is out of range")
+        prioritized = energy_rank == prioritized_stem_index
+        energy_rank = torch.cat(
+            [
+                energy_rank.masked_select(prioritized).view(batch_size, 1),
+                energy_rank.masked_select(~prioritized).view(batch_size, num_stems - 1),
+            ],
+            dim=1,
+        )
 
     dropped_counts = torch.randint(
         low=1,
