@@ -700,7 +700,8 @@ def compute_loss(
         if output.broadband_flux_logits is None or output.onset_env_logits is None:
             raise ValueError("Model output must include drum auxiliary logits")
 
-        valid_mask = batch["valid_mask"]
+        # drums stem を落としたサンプルでは、drum aux を教師にしない。
+        valid_mask = batch.get("drum_aux_valid_mask", batch["valid_mask"])
         broadband_flux_predictions = torch.sigmoid(output.broadband_flux_logits)
         onset_env_predictions = torch.sigmoid(output.onset_env_logits)
         broadband_flux_loss = masked_l1_loss(
@@ -848,6 +849,7 @@ def train_one_epoch(
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     num_stems: int,
+    drums_stem_index: int,
     stem_dropout_max_count: int,
     device: torch.device,
     use_amp: bool,
@@ -869,15 +871,23 @@ def train_one_epoch(
     for batch_index, batch in enumerate(progress, start=1):
         batch = move_batch_to_device(batch, device)
         optimizer.zero_grad(set_to_none=True)
+        batch["drum_aux_valid_mask"] = batch["valid_mask"]
 
         dropped_stem_count = 0.0
+        drum_aux_masked_fraction = 0.0
         if stem_dropout_max_count > 0:
-            batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
+            batch["waveform"], dropped_counts, drop_mask = apply_ranked_stem_dropout(
                 batch["waveform"],
                 num_stems=num_stems,
                 max_dropout_stems=stem_dropout_max_count,
             )
             dropped_stem_count = float(dropped_counts.float().mean().item())
+            drums_dropped = drop_mask[:, drums_stem_index]
+            drum_aux_masked_fraction = float(drums_dropped.float().mean().item())
+            if bool(drums_dropped.any()):
+                drum_aux_valid_mask = batch["valid_mask"].clone()
+                drum_aux_valid_mask[drums_dropped] = 0.0
+                batch["drum_aux_valid_mask"] = drum_aux_valid_mask
 
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
@@ -896,6 +906,7 @@ def train_one_epoch(
                 drum_aux_use_high_frequency_flux,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
+            loss_info["drum_aux_masked_fraction"] = drum_aux_masked_fraction
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -974,6 +985,11 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/drum_aux_masked_fraction",
+                loss_info["drum_aux_masked_fraction"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/lr", optimizer.param_groups[0]["lr"], global_step
             )
 
@@ -984,6 +1000,7 @@ def train_one_epoch(
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
+                drum_mask=f"{loss_info['drum_aux_masked_fraction']:.2f}",
             )
 
     return tracker.averages(), global_step
@@ -1209,6 +1226,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "onset_env_loss",
         "high_frequency_flux_loss",
         "stem_dropout_count",
+        "drum_aux_masked_fraction",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1236,6 +1254,7 @@ def main() -> None:
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
     train_dataset, train_loader, val_loader = build_dataloaders(args)
+    drums_stem_index = train_dataset.stem_names.index("drums")
     model = build_model(args, train_dataset).to(device)
     init_info: Optional[dict[str, object]] = None
     if args.init_from is not None:
@@ -1378,6 +1397,7 @@ def main() -> None:
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 num_stems=len(train_dataset.stem_names),
+                drums_stem_index=drums_stem_index,
                 stem_dropout_max_count=args.stem_dropout_max_count,
                 device=device,
                 use_amp=args.use_amp,

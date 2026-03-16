@@ -9,7 +9,7 @@ def apply_ranked_stem_dropout(
     waveform: torch.Tensor,
     num_stems: int,
     max_dropout_stems: int,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     stem ごとのエネルギーを見て、弱い stem から順にランダム本数だけ落とす。
     最低 1 stem は残し、学習時の頑健性を上げるために使う。
@@ -28,7 +28,12 @@ def apply_ranked_stem_dropout(
         dropped_counts = torch.zeros(
             batch_size, dtype=torch.long, device=waveform.device
         )
-        return waveform, dropped_counts
+        drop_mask = torch.zeros(
+            (batch_size, num_stems),
+            dtype=torch.bool,
+            device=waveform.device,
+        )
+        return waveform, dropped_counts, drop_mask
 
     stem_waveform = waveform.view(batch_size, num_stems, channels_per_stem, num_samples)
 
@@ -56,7 +61,7 @@ def apply_ranked_stem_dropout(
         drop_mask.unsqueeze(-1).unsqueeze(-1),
         0.0,
     )
-    return augmented.view_as(waveform), dropped_counts
+    return augmented.view_as(waveform), dropped_counts, drop_mask
 
 
 @torch.no_grad()
