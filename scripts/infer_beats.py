@@ -570,6 +570,57 @@ def build_segment_starts(
     return starts
 
 
+def build_meter_segments_from_downbeats(
+    meter_logits: torch.Tensor,
+    downbeat_indices: list[int],
+    frame_duration_sec: float,
+    meter_labels: list[str],
+) -> list[dict[str, object]]:
+    """
+    predicted downbeat で切った各区間に対して、meter を 1 つだけ割り当てる。
+
+    基本は [downbeat_i, downbeat_{i+1}) を 1 小節として扱い、
+    区間内の frame-level meter logits を平均して最終ラベルを決める。
+    最後の downbeat 以降も残りがあれば 1 区間として出力する。
+    """
+    if meter_logits.numel() == 0 or not meter_labels:
+        return []
+    if not downbeat_indices:
+        return []
+
+    total_frames = int(meter_logits.shape[0])
+    boundaries = sorted(int(frame_index) for frame_index in downbeat_indices)
+    segments: list[tuple[int, int]] = []
+
+    for start_frame, end_frame in zip(boundaries[:-1], boundaries[1:]):
+        if end_frame > start_frame:
+            segments.append((start_frame, end_frame))
+
+    last_downbeat = boundaries[-1]
+    if total_frames > last_downbeat:
+        segments.append((last_downbeat, total_frames))
+
+    meter_segments: list[dict[str, object]] = []
+    for start_frame, end_frame in segments:
+        segment_logits = meter_logits[start_frame:end_frame]
+        if segment_logits.numel() == 0:
+            continue
+
+        segment_mean_logits = segment_logits.mean(dim=0)
+        segment_probabilities = torch.softmax(segment_mean_logits, dim=-1)
+        class_index = int(segment_probabilities.argmax().item())
+        meter_segments.append(
+            {
+                "start_sec": start_frame * frame_duration_sec,
+                "end_sec": end_frame * frame_duration_sec,
+                "label": meter_labels[class_index],
+                "confidence": float(segment_probabilities[class_index].item()),
+            }
+        )
+
+    return meter_segments
+
+
 def infer_track(
     model: BeatTranscriptionModel,
     waveform: torch.Tensor,
@@ -701,41 +752,48 @@ def infer_track(
         dedupe_interval_sec,
     )
 
-    meter_prob = torch.softmax(meter_logits, dim=-1)
-    meter_class = meter_prob.argmax(dim=-1)
-    meter_segments: list[dict[str, object]] = []
-    if len(meter_labels) > 0 and meter_class.numel() > 0:
-        start_frame = 0
-        current_class = int(meter_class[0].item())
-        current_confidences = [float(meter_prob[0, current_class].item())]
-        for frame_idx in range(1, int(meter_class.numel())):
-            class_index = int(meter_class[frame_idx].item())
-            if class_index == current_class:
-                current_confidences.append(
-                    float(meter_prob[frame_idx, class_index].item())
+    meter_segments = build_meter_segments_from_downbeats(
+        meter_logits=meter_logits,
+        downbeat_indices=downbeat_indices,
+        frame_duration_sec=frame_duration_sec,
+        meter_labels=meter_labels,
+    )
+    if not meter_segments:
+        # downbeat が十分に取れない曲だけは、従来の frame-wise 出力へ戻す。
+        meter_prob = torch.softmax(meter_logits, dim=-1)
+        meter_class = meter_prob.argmax(dim=-1)
+        if len(meter_labels) > 0 and meter_class.numel() > 0:
+            start_frame = 0
+            current_class = int(meter_class[0].item())
+            current_confidences = [float(meter_prob[0, current_class].item())]
+            for frame_idx in range(1, int(meter_class.numel())):
+                class_index = int(meter_class[frame_idx].item())
+                if class_index == current_class:
+                    current_confidences.append(
+                        float(meter_prob[frame_idx, class_index].item())
+                    )
+                    continue
+
+                meter_segments.append(
+                    {
+                        "start_sec": start_frame * frame_duration_sec,
+                        "end_sec": frame_idx * frame_duration_sec,
+                        "label": meter_labels[current_class],
+                        "confidence": float(np.mean(current_confidences)),
+                    }
                 )
-                continue
+                start_frame = frame_idx
+                current_class = class_index
+                current_confidences = [float(meter_prob[frame_idx, class_index].item())]
 
             meter_segments.append(
                 {
                     "start_sec": start_frame * frame_duration_sec,
-                    "end_sec": frame_idx * frame_duration_sec,
+                    "end_sec": meter_class.numel() * frame_duration_sec,
                     "label": meter_labels[current_class],
                     "confidence": float(np.mean(current_confidences)),
                 }
             )
-            start_frame = frame_idx
-            current_class = class_index
-            current_confidences = [float(meter_prob[frame_idx, class_index].item())]
-
-        meter_segments.append(
-            {
-                "start_sec": start_frame * frame_duration_sec,
-                "end_sec": meter_class.numel() * frame_duration_sec,
-                "label": meter_labels[current_class],
-                "confidence": float(np.mean(current_confidences)),
-            }
-        )
 
     return {
         "beat_times_sec": beat_times_sec,
