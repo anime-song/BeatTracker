@@ -6,6 +6,8 @@ __pycache__/
 dataset/**/audios/
 dataset/**/songs_separated/
 dataset/**/songs_packed/
+dataset/**/unlabeled_dataset
+dataset/**/unlabeled_original
 
 # Training outputs
 outputs/*
