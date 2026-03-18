@@ -39,6 +39,9 @@ class PLPPseudoTeacher(nn.Module):
         tempo_max: float = 300.0,
         peak_threshold: float = 0.3,
         min_peak_distance: Optional[int] = None,
+        dominant_tempo_radius: int = 1,
+        peak_smooth_kernel: int = 9,
+        peak_local_baseline_kernel: int = 31,
     ) -> None:
         super().__init__()
         self.sample_rate = int(sample_rate)
@@ -49,6 +52,9 @@ class PLPPseudoTeacher(nn.Module):
         self.tempo_max = float(tempo_max)
         self.peak_threshold = float(peak_threshold)
         self.min_peak_distance = None if min_peak_distance is None else int(min_peak_distance)
+        self.dominant_tempo_radius = int(dominant_tempo_radius)
+        self.peak_smooth_kernel = int(peak_smooth_kernel)
+        self.peak_local_baseline_kernel = int(peak_local_baseline_kernel)
 
         if self.sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
@@ -60,6 +66,12 @@ class PLPPseudoTeacher(nn.Module):
             raise ValueError("win_length must be positive")
         if self.tempo_max <= self.tempo_min:
             raise ValueError("tempo_max must be larger than tempo_min")
+        if self.dominant_tempo_radius < 0:
+            raise ValueError("dominant_tempo_radius must be non-negative")
+        if self.peak_smooth_kernel <= 0:
+            raise ValueError("peak_smooth_kernel must be positive")
+        if self.peak_local_baseline_kernel <= 0:
+            raise ValueError("peak_local_baseline_kernel must be positive")
 
         self.register_buffer("analysis_window", torch.hann_window(self.n_fft), persistent=False)
         self.register_buffer("tempogram_window", torch.hann_window(self.win_length), persistent=False)
@@ -70,6 +82,15 @@ class PLPPseudoTeacher(nn.Module):
 
         scale = x.amax().clamp_min(1e-6)
         return x / scale
+
+    @staticmethod
+    def _resolve_odd_kernel(length: int, requested: int) -> int:
+        """系列長を超えない奇数 kernel に丸める。"""
+
+        kernel = max(1, min(int(requested), int(length)))
+        if kernel % 2 == 0:
+            kernel -= 1
+        return max(1, kernel)
 
     def _detect_peaks(self, pulse: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -94,22 +115,57 @@ class PLPPseudoTeacher(nn.Module):
         else:
             min_distance = max(1, self.min_peak_distance)
 
-        threshold = float(pulse.amax()) * self.peak_threshold
-        pooled = F.max_pool1d(
+        # グローバル最大値ではなく、局所平滑化した pulse の盛り上がり量で候補を選ぶ。
+        # これにより、一部だけ強いアクセントがある区間でも弱い拍を拾いやすくする。
+        smooth_kernel = self._resolve_odd_kernel(pulse.numel(), self.peak_smooth_kernel)
+        baseline_kernel = self._resolve_odd_kernel(
+            pulse.numel(),
+            self.peak_local_baseline_kernel,
+        )
+        smoothed_pulse = F.avg_pool1d(
             pulse.view(1, 1, -1),
+            kernel_size=smooth_kernel,
+            stride=1,
+            padding=smooth_kernel // 2,
+        ).view(-1)
+        local_baseline = F.avg_pool1d(
+            smoothed_pulse.view(1, 1, -1),
+            kernel_size=baseline_kernel,
+            stride=1,
+            padding=baseline_kernel // 2,
+        ).view(-1)
+        prominence = (smoothed_pulse - local_baseline).clamp_min(0.0)
+        local_prominence = F.avg_pool1d(
+            prominence.view(1, 1, -1),
+            kernel_size=smooth_kernel,
+            stride=1,
+            padding=smooth_kernel // 2,
+        ).view(-1)
+        minimum_prominence = float(prominence.mean()) * self.peak_threshold
+        adaptive_threshold = torch.maximum(
+            local_prominence * (1.0 + self.peak_threshold),
+            prominence.new_full(prominence.shape, minimum_prominence),
+        )
+        pooled = F.max_pool1d(
+            smoothed_pulse.view(1, 1, -1),
             kernel_size=(2 * min_distance) + 1,
             stride=1,
             padding=min_distance,
         ).view(-1)
-        candidate_indices = ((pulse >= threshold) & (pulse == pooled)).nonzero(as_tuple=False).squeeze(-1)
+        candidate_indices = (
+            (prominence > 0.0)
+            & (prominence >= adaptive_threshold)
+            & (smoothed_pulse == pooled)
+        ).nonzero(as_tuple=False).squeeze(-1)
 
         # しきい値が厳しすぎた場合でも、完全に候補ゼロにはしない。
         if candidate_indices.numel() == 0 and float(pulse.amax()) > 0.0:
-            candidate_indices = pulse.argmax().view(1)
+            fallback_source = prominence if float(prominence.amax()) > 0.0 else smoothed_pulse
+            candidate_indices = fallback_source.argmax().view(1)
 
         if candidate_indices.numel() > 1:
             ordered_indices = torch.argsort(
-                pulse.index_select(0, candidate_indices),
+                prominence.index_select(0, candidate_indices),
                 descending=True,
             )
             selected: list[int] = []
@@ -185,7 +241,8 @@ class PLPPseudoTeacher(nn.Module):
             onset_envelope = onset_envelope[:frame_count]
         onset_envelope = self._normalize_to_unit_max(onset_envelope)
 
-        # 次に tempo 候補のうち卓越する成分だけを残し、PLP pulse を復元する。
+        # 次に tempo 候補のうち卓越する帯域を残し、PLP pulse を復元する。
+        # 1 bin に固定するとテンポ揺れや倍テン候補に弱いので、近傍 bin も少し残す。
         max_supported_win_length = max(2, (2 * onset_envelope.numel()) - 1)
         effective_win_length = min(self.win_length, max_supported_win_length)
         tempogram_window = (
@@ -216,8 +273,19 @@ class PLPPseudoTeacher(nn.Module):
 
         ftgram = ftgram * valid_tempo.unsqueeze(-1)
         ftmag = torch.log1p(1e6 * ftgram.abs())
-        peak_values = ftmag.max(dim=0, keepdim=True).values
-        ftgram = torch.where(ftmag >= peak_values, ftgram, torch.zeros_like(ftgram))
+        masked_ftmag = ftmag.masked_fill(~valid_tempo.unsqueeze(-1), float("-inf"))
+        peak_index = masked_ftmag.argmax(dim=0)
+        freq_index = torch.arange(ftgram.shape[0], device=waveform.device).unsqueeze(1)
+        distance_to_peak = (freq_index - peak_index.unsqueeze(0)).abs()
+        band_mask = distance_to_peak <= self.dominant_tempo_radius
+        band_mask = band_mask & valid_tempo.unsqueeze(-1)
+        if self.dominant_tempo_radius > 0:
+            band_weight = (
+                (self.dominant_tempo_radius + 1) - distance_to_peak
+            ).clamp_min(0).to(dtype=ftgram.real.dtype) / float(self.dominant_tempo_radius + 1)
+            ftgram = torch.where(band_mask, ftgram * band_weight, torch.zeros_like(ftgram))
+        else:
+            ftgram = torch.where(band_mask, ftgram, torch.zeros_like(ftgram))
         ftgram = ftgram / ftgram.abs().amax(dim=0, keepdim=True).clamp_min(1e-6)
 
         pulse = torch.istft(

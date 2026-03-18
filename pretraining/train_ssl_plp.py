@@ -25,6 +25,7 @@ from pretraining.contrastive import PLPContrastiveLoss
 from pretraining.model import PLPContrastiveBackboneModel
 from pretraining.plp_teacher import PLPPseudoTeacher
 from pretraining.unlabeled_dataset import UnlabeledStemDataset
+from training.losses import ShiftTolerantBCELoss
 
 
 @dataclass
@@ -117,6 +118,8 @@ class TrainingComponents:
     model: PLPContrastiveBackboneModel
     teacher: PLPPseudoTeacher
     criterion: PLPContrastiveLoss
+    chord_boundary_loss_fn: ShiftTolerantBCELoss
+    chord_boundary_loss_weight: float
     optimizer: torch.optim.Optimizer
     scheduler: Optional[WarmupCosineScheduler]
     scaler: torch.amp.GradScaler
@@ -166,6 +169,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable-persistent-workers", action="store_true")
     parser.add_argument("--disable-file-handle-cache", action="store_true")
     parser.add_argument("--max-open-files", type=int, default=64)
+    parser.add_argument(
+        "--chord-boundary-cache-dir",
+        type=Path,
+        default=None,
+        help="事前推論済み chord boundary cache。未指定なら教師なしで動く。",
+    )
     parser.add_argument("--train-samples-per-epoch", type=int, default=1024)
     parser.add_argument("--segment-seconds", type=float, default=30.0)
     parser.add_argument("--sample-rate", type=int, default=22050)
@@ -193,19 +202,95 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-lr-ratio", type=float, default=0.1)
     parser.add_argument("--temperature", type=float, default=0.1)
     parser.add_argument(
+        "--positive-multiples",
         "--positive-offsets",
+        dest="positive_multiples",
         type=int,
         nargs="+",
-        default=[1, 2, 4],
-        help="Positive peak-order offsets used by the contrastive objective.",
+        default=[1, 2],
+        help="局所 tau に対する positive 倍数。既定値は ±tau, ±2tau。",
     )
-    parser.add_argument("--negative-safety-radius", type=int, default=4)
+    parser.add_argument(
+        "--tau-neighborhood",
+        type=int,
+        default=2,
+        help="anchor 周辺の inter-peak interval を何個ぶん見て局所 tau を見積もるか。",
+    )
+    parser.add_argument(
+        "--positive-tolerance-ratio",
+        type=float,
+        default=0.25,
+        help="positive 距離判定の許容幅を tau 倍率で与える。",
+    )
+    parser.add_argument(
+        "--positive-tolerance-frames",
+        type=int,
+        default=2,
+        help="positive 距離判定の最小許容幅 [frames]。",
+    )
+    parser.add_argument(
+        "--negative-safety-radius-frames",
+        "--negative-safety-radius",
+        dest="negative_safety_radius_frames",
+        type=int,
+        default=4,
+        help="negative を除外する最小 frame 距離。",
+    )
+    parser.add_argument(
+        "--negative-safety-radius-ratio",
+        type=float,
+        default=0.5,
+        help="局所 tau に対する negative 安全半径の倍率。",
+    )
     parser.add_argument("--num-negatives", type=int, default=32)
     parser.add_argument("--max-anchors-per-sample", type=int, default=64)
-    parser.add_argument("--plp-win-length", type=int, default=384)
+    parser.add_argument(
+        "--anchor-sampling",
+        type=str,
+        choices=("weighted_random", "random", "topk"),
+        default="weighted_random",
+        help="contrastive anchor の選び方。",
+    )
+    parser.add_argument(
+        "--chord-boundary-loss-weight",
+        type=float,
+        default=5.0,
+        help="事前推論済み chord boundary を使う補助 loss の重み。",
+    )
+    parser.add_argument(
+        "--chord-boundary-pos-weight",
+        type=float,
+        default=5.0,
+        help="chord boundary BCE の positive weight。",
+    )
+    parser.add_argument(
+        "--chord-boundary-tolerance",
+        type=int,
+        default=2,
+        help="chord boundary BCE が許容するフレームずれ幅。",
+    )
+    parser.add_argument("--plp-win-length", type=int, default=192)
     parser.add_argument("--plp-tempo-min", type=float, default=30.0)
     parser.add_argument("--plp-tempo-max", type=float, default=300.0)
+    parser.add_argument(
+        "--plp-dominant-tempo-radius",
+        type=int,
+        default=1,
+        help="卓越テンポ bin の前後何 bin まで残すか。0 なら従来どおり 1 bin のみ。",
+    )
     parser.add_argument("--plp-peak-threshold", type=float, default=0.3)
+    parser.add_argument(
+        "--plp-peak-smooth-kernel",
+        type=int,
+        default=9,
+        help="PLP pulse を平滑化する kernel サイズ。",
+    )
+    parser.add_argument(
+        "--plp-peak-baseline-kernel",
+        type=int,
+        default=31,
+        help="局所ベースラインを作る kernel サイズ。",
+    )
     parser.add_argument(
         "--plp-min-peak-distance",
         type=int,
@@ -261,6 +346,12 @@ def build_training_components(
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
 
+    chord_boundary_cache_dir = args.chord_boundary_cache_dir
+    if chord_boundary_cache_dir is None:
+        default_boundary_cache_dir = args.dataset_root / ".chord_boundary_cache"
+        if default_boundary_cache_dir.exists():
+            chord_boundary_cache_dir = default_boundary_cache_dir
+
     dataset = UnlabeledStemDataset(
         dataset_root=args.dataset_root,
         segment_seconds=args.segment_seconds,
@@ -272,6 +363,7 @@ def build_training_components(
         max_open_files=args.max_open_files,
         manifest_path=args.manifest_path,
         rebuild_manifest=args.rebuild_manifest,
+        chord_boundary_cache_dir=chord_boundary_cache_dir,
     )
 
     loader_kwargs = {
@@ -316,16 +408,28 @@ def build_training_components(
         win_length=args.plp_win_length,
         tempo_min=args.plp_tempo_min,
         tempo_max=args.plp_tempo_max,
+        dominant_tempo_radius=args.plp_dominant_tempo_radius,
         peak_threshold=args.plp_peak_threshold,
+        peak_smooth_kernel=args.plp_peak_smooth_kernel,
+        peak_local_baseline_kernel=args.plp_peak_baseline_kernel,
         min_peak_distance=args.plp_min_peak_distance,
     ).to(device)
 
     criterion = PLPContrastiveLoss(
         temperature=args.temperature,
-        positive_offsets=args.positive_offsets,
-        negative_safety_radius=args.negative_safety_radius,
+        positive_multiples=args.positive_multiples,
+        tau_neighborhood=args.tau_neighborhood,
+        positive_tolerance_ratio=args.positive_tolerance_ratio,
+        positive_tolerance_frames=args.positive_tolerance_frames,
+        negative_safety_radius_ratio=args.negative_safety_radius_ratio,
+        negative_safety_radius_frames=args.negative_safety_radius_frames,
         num_negatives=args.num_negatives,
         max_anchors_per_sample=args.max_anchors_per_sample,
+        anchor_sampling=args.anchor_sampling,
+    )
+    chord_boundary_loss_fn = ShiftTolerantBCELoss(
+        pos_weight=args.chord_boundary_pos_weight,
+        tolerance=args.chord_boundary_tolerance,
     )
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -357,6 +461,8 @@ def build_training_components(
         model=model,
         teacher=teacher,
         criterion=criterion,
+        chord_boundary_loss_fn=chord_boundary_loss_fn,
+        chord_boundary_loss_weight=float(args.chord_boundary_loss_weight),
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=scaler,
@@ -532,12 +638,22 @@ def train_one_epoch(
             device_type=device.type,
             enabled=components.scaler.is_enabled(),
         ):
-            embeddings = components.model(batch["waveform"])
-            loss, loss_metrics = components.criterion(
-                embeddings=embeddings,
+            model_output = components.model(batch["waveform"])
+            contrastive_loss, loss_metrics = components.criterion(
+                embeddings=model_output.embeddings,
                 peak_mask=teacher_output.peak_mask,
                 peak_values=teacher_output.peak_values,
                 valid_mask=valid_mask,
+            )
+            chord_boundary_loss = contrastive_loss.detach().new_zeros(())
+            if components.chord_boundary_loss_weight > 0.0:
+                chord_boundary_loss = components.chord_boundary_loss_fn(
+                    preds=model_output.chord_boundary_logits,
+                    targets=batch["chord_boundary_target"],
+                    mask=batch["chord_boundary_mask"],
+                )
+            loss = contrastive_loss + (
+                components.chord_boundary_loss_weight * chord_boundary_loss
             )
 
         components.scaler.scale(loss).backward()
@@ -555,10 +671,20 @@ def train_one_epoch(
                 teacher_output.peak_mask.sum(dim=1).mean().detach()
             ),
             "plp_pulse_mean": float(teacher_output.pulse.mean().detach()),
+            "chord_boundary_events": float(
+                batch["chord_boundary_event_count"].to(torch.float32).mean().detach()
+            ),
+            "chord_boundary_supervised_samples": float(
+                (batch["chord_boundary_mask"].sum(dim=1) > 0)
+                .to(torch.float32)
+                .mean()
+                .detach()
+            ),
         }
         batch_metrics = {
             "loss": float(loss.detach()),
             "lr": float(components.optimizer.param_groups[0]["lr"]),
+            "chord_boundary_loss": float(chord_boundary_loss.detach()),
             **loss_metrics,
             **teacher_metrics,
         }

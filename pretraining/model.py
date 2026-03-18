@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,8 +32,16 @@ class ProjectionHead(nn.Module):
         return F.normalize(self.net(x), dim=-1)
 
 
+@dataclass
+class PLPContrastiveModelOutput:
+    """事前学習で使う各 head の出力をまとめる。"""
+
+    embeddings: torch.Tensor
+    chord_boundary_logits: torch.Tensor
+
+
 class PLPContrastiveBackboneModel(nn.Module):
-    """Backbone + projector だけを持つ事前学習用の薄いラッパ。"""
+    """Backbone + projector + chord boundary head を持つ事前学習用ラッパ。"""
 
     def __init__(
         self,
@@ -48,8 +58,15 @@ class PLPContrastiveBackboneModel(nn.Module):
             hidden_dim=projection_hidden_dim,
             dropout=projector_dropout,
         )
+        self.chord_boundary_head = nn.Sequential(
+            nn.LayerNorm(backbone.output_dim),
+            nn.Linear(backbone.output_dim, 1),
+        )
 
-    def forward(self, waveform: torch.Tensor) -> torch.Tensor:
-        # 時間方向の特徴列をそのまま projector に通して frame-wise embedding を得る。
+    def forward(self, waveform: torch.Tensor) -> PLPContrastiveModelOutput:
+        # 時間方向の特徴列を projector と補助 head へ流す。
         frame_features = self.backbone(waveform)
-        return self.projector(frame_features)
+        return PLPContrastiveModelOutput(
+            embeddings=self.projector(frame_features),
+            chord_boundary_logits=self.chord_boundary_head(frame_features).squeeze(-1),
+        )
