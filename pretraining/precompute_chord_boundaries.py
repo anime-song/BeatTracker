@@ -100,6 +100,19 @@ def parse_args() -> argparse.Namespace:
         help="無ラベル stem dataset の manifest JSON。",
     )
     parser.add_argument(
+        "--audio-backend",
+        type=str,
+        choices=("wav", "packed"),
+        default="wav",
+        help="入力音声の読込元。packed を使うと songs_packed の npy/json を読みます。",
+    )
+    parser.add_argument(
+        "--packed-audio-dir",
+        type=Path,
+        default=None,
+        help="packed 音声ディレクトリ。未指定なら <dataset-root>/songs_packed を使います。",
+    )
+    parser.add_argument(
         "--rebuild-manifest",
         action="store_true",
         help="既存 manifest を無視して dataset 走査から再生成する。",
@@ -145,6 +158,8 @@ def main() -> None:
         sample_rate=teacher.sample_rate,
         hop_length=teacher.hop_length,
         n_fft=teacher.n_fft,
+        audio_backend=args.audio_backend,
+        packed_audio_dir=args.packed_audio_dir,
         manifest_path=args.manifest_path,
         rebuild_manifest=args.rebuild_manifest,
     )
@@ -152,6 +167,8 @@ def main() -> None:
     metadata = {
         "dataset_root": str(args.dataset_root),
         "output_dir": str(output_dir),
+        "audio_backend": args.audio_backend,
+        "packed_audio_dir": None if args.packed_audio_dir is None else str(args.packed_audio_dir),
         "checkpoint_path": str(args.checkpoint_path),
         "config_path": str(args.config_path),
         "sample_rate": teacher.sample_rate,
@@ -190,11 +207,21 @@ def main() -> None:
 
         if args.show_chunk_progress:
             print(f"[chord-boundary] song={song.song_id}")
-        prediction = teacher.predict_from_stem_paths(
-            song.stem_paths,
-            song_id=song.song_id,
-            show_chunk_progress=args.show_chunk_progress,
-        )
+        if args.audio_backend == "packed":
+            if song.packed_audio is None:
+                raise ValueError(f"Packed audio metadata is missing for {song.song_id}")
+            prediction = teacher.predict_from_packed_audio(
+                packed_audio=song.packed_audio,
+                packed_stem_order=dataset.stem_names,
+                song_id=song.song_id,
+                show_chunk_progress=args.show_chunk_progress,
+            )
+        else:
+            prediction = teacher.predict_from_stem_paths(
+                song.stem_paths,
+                song_id=song.song_id,
+                show_chunk_progress=args.show_chunk_progress,
+            )
         payload = {
             "song_id": song.song_id,
             "sample_rate": teacher.sample_rate,
