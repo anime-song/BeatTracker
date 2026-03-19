@@ -4,7 +4,9 @@ import copy
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,6 +15,7 @@ import torchaudio.functional as AF
 import yaml
 from tqdm.auto import tqdm
 
+from data.beat_dataset import PackedAudioEntry
 from models import AudioFeatureExtractor, Backbone
 from models.transformer import RMSNorm
 
@@ -240,6 +243,77 @@ class ChordBoundaryTeacher:
         ]
         return torch.cat(padded, dim=0)
 
+    def load_packed_song_waveform(
+        self,
+        packed_audio: PackedAudioEntry,
+        packed_stem_order: Sequence[str],
+    ) -> torch.Tensor:
+        """packed npy/json から 1 曲ぶんの waveform を読み、teacher の stem 順へ並べ替える。"""
+
+        packed_stem_order = tuple(str(stem_name) for stem_name in packed_stem_order)
+        if tuple(sorted(packed_stem_order)) != tuple(sorted(self.stem_order)):
+            raise ValueError(
+                "Packed stem order does not match the teacher stem set: "
+                f"packed={packed_stem_order}, teacher={self.stem_order}"
+            )
+
+        packed_array = np.load(packed_audio.array_path, mmap_mode="r")
+        try:
+            waveform = torch.from_numpy(np.array(packed_array, copy=True)).to(torch.float32)
+        finally:
+            mmap_handle = getattr(packed_array, "_mmap", None)
+            if mmap_handle is not None:
+                mmap_handle.close()
+
+        packed_num_stems = len(packed_stem_order)
+        expected_num_channels = packed_num_stems * packed_audio.channels_per_stem
+        if waveform.shape[0] != expected_num_channels:
+            raise ValueError(
+                f"Unexpected num_channels in {packed_audio.array_path}: {waveform.shape[0]}"
+            )
+
+        waveform_per_stem = waveform.view(
+            packed_num_stems,
+            packed_audio.channels_per_stem,
+            waveform.shape[-1],
+        )
+        packed_stem_to_index = {
+            stem_name: stem_index for stem_index, stem_name in enumerate(packed_stem_order)
+        }
+
+        reordered_waveforms: list[torch.Tensor] = []
+        for stem_name in self.stem_order:
+            if stem_name not in packed_stem_to_index:
+                raise ValueError(f"Stem '{stem_name}' is missing in packed audio")
+
+            stem_waveform = waveform_per_stem[packed_stem_to_index[stem_name]]
+            if packed_audio.sample_rate != self.sample_rate:
+                stem_waveform = AF.resample(
+                    stem_waveform,
+                    orig_freq=packed_audio.sample_rate,
+                    new_freq=self.sample_rate,
+                )
+
+            if self.mixdown_to_mono:
+                stem_waveform = stem_waveform.mean(dim=0, keepdim=True)
+            elif stem_waveform.shape[0] == 1 and self.channels_per_stem == 2:
+                stem_waveform = stem_waveform.repeat(2, 1)
+            elif stem_waveform.shape[0] > self.channels_per_stem:
+                stem_waveform = stem_waveform[: self.channels_per_stem]
+
+            if stem_waveform.shape[0] != self.channels_per_stem:
+                raise ValueError(
+                    f"Unexpected packed channel count for stem '{stem_name}': {stem_waveform.shape[0]}"
+                )
+            reordered_waveforms.append(stem_waveform)
+
+        max_samples = max(waveform.shape[-1] for waveform in reordered_waveforms)
+        padded = [
+            F.pad(waveform, (0, max_samples - waveform.shape[-1]))
+            for waveform in reordered_waveforms
+        ]
+        return torch.cat(padded, dim=0)
+
     def _infer_boundary_probabilities(self, waveform: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         長い曲でも推論できるよう、少し重なりを持たせた chunk ごとに処理する。
@@ -358,6 +432,35 @@ class ChordBoundaryTeacher:
         show_chunk_progress: bool = False,
     ) -> ChordBoundaryPrediction:
         waveform = self.load_song_waveform(stem_paths)
+        return self.predict_from_waveform(
+            waveform=waveform,
+            song_id=song_id,
+            show_chunk_progress=show_chunk_progress,
+        )
+
+    def predict_from_packed_audio(
+        self,
+        packed_audio: PackedAudioEntry,
+        packed_stem_order: Sequence[str],
+        song_id: str | None = None,
+        show_chunk_progress: bool = False,
+    ) -> ChordBoundaryPrediction:
+        waveform = self.load_packed_song_waveform(
+            packed_audio=packed_audio,
+            packed_stem_order=packed_stem_order,
+        )
+        return self.predict_from_waveform(
+            waveform=waveform,
+            song_id=song_id,
+            show_chunk_progress=show_chunk_progress,
+        )
+
+    def predict_from_waveform(
+        self,
+        waveform: torch.Tensor,
+        song_id: str | None = None,
+        show_chunk_progress: bool = False,
+    ) -> ChordBoundaryPrediction:
         if show_chunk_progress:
             duration_sec = float(waveform.shape[-1]) / float(self.sample_rate)
             print(
