@@ -45,7 +45,9 @@ def _load_yaml(path: Path) -> dict:
         return yaml.safe_load(fp)
 
 
-def infer_backbone_num_layers_from_state_dict(state_dict: dict[str, torch.Tensor]) -> int | None:
+def infer_backbone_num_layers_from_state_dict(
+    state_dict: dict[str, torch.Tensor],
+) -> int | None:
     """checkpoint の key から backbone の層数を推定する。"""
 
     layer_indices: list[int] = []
@@ -72,7 +74,9 @@ class ChordBoundaryModel(nn.Module):
         self.backbone = backbone
         self.norm = RMSNorm(hidden_size) if use_layer_norm else nn.Identity()
         self.dropout = (
-            nn.Dropout(dropout_probability) if dropout_probability > 0.0 else nn.Identity()
+            nn.Dropout(dropout_probability)
+            if dropout_probability > 0.0
+            else nn.Identity()
         )
         self.boundary_head = nn.Linear(hidden_size, 1)
 
@@ -163,7 +167,9 @@ class ChordBoundaryTeacher:
         if self.min_boundary_distance_frames < 1:
             raise ValueError("min_boundary_distance_frames must be positive")
         if not self.checkpoint_path.exists():
-            raise FileNotFoundError(f"Chord checkpoint not found: {self.checkpoint_path}")
+            raise FileNotFoundError(
+                f"Chord checkpoint not found: {self.checkpoint_path}"
+            )
         if not self.config_path.exists():
             raise FileNotFoundError(f"Chord config not found: {self.config_path}")
 
@@ -172,7 +178,9 @@ class ChordBoundaryTeacher:
             map_location="cpu",
             weights_only=False,
         )
-        state_dict = checkpoint.get("ema_state_dict") or checkpoint.get("model_state_dict")
+        state_dict = checkpoint.get("ema_state_dict") or checkpoint.get(
+            "model_state_dict"
+        )
         if not isinstance(state_dict, dict):
             raise ValueError(
                 "Chord checkpoint must contain ema_state_dict or model_state_dict"
@@ -180,7 +188,9 @@ class ChordBoundaryTeacher:
         self.config = _load_yaml(self.config_path)
         inferred_num_layers = infer_backbone_num_layers_from_state_dict(state_dict)
         if inferred_num_layers is not None:
-            config_num_layers = int(self.config["model"]["backbone"].get("num_layers", 1))
+            config_num_layers = int(
+                self.config["model"]["backbone"].get("num_layers", 1)
+            )
             if config_num_layers != inferred_num_layers:
                 self.config = copy.deepcopy(self.config)
                 self.config["model"]["backbone"]["num_layers"] = inferred_num_layers
@@ -236,10 +246,14 @@ class ChordBoundaryTeacher:
     def load_song_waveform(self, stem_paths: dict[str, Path]) -> torch.Tensor:
         """1 曲ぶんの stems を読み、モデル入力の多 ch waveform へ整形する。"""
 
-        waveforms = [self._load_stem_waveform(stem_paths[stem_name]) for stem_name in self.stem_order]
+        waveforms = [
+            self._load_stem_waveform(stem_paths[stem_name])
+            for stem_name in self.stem_order
+        ]
         max_samples = max(waveform.shape[-1] for waveform in waveforms)
         padded = [
-            F.pad(waveform, (0, max_samples - waveform.shape[-1])) for waveform in waveforms
+            F.pad(waveform, (0, max_samples - waveform.shape[-1]))
+            for waveform in waveforms
         ]
         return torch.cat(padded, dim=0)
 
@@ -259,7 +273,9 @@ class ChordBoundaryTeacher:
 
         packed_array = np.load(packed_audio.array_path, mmap_mode="r")
         try:
-            waveform = torch.from_numpy(np.array(packed_array, copy=True)).to(torch.float32)
+            waveform = torch.from_numpy(np.array(packed_array, copy=True)).to(
+                torch.float32
+            )
         finally:
             mmap_handle = getattr(packed_array, "_mmap", None)
             if mmap_handle is not None:
@@ -278,7 +294,8 @@ class ChordBoundaryTeacher:
             waveform.shape[-1],
         )
         packed_stem_to_index = {
-            stem_name: stem_index for stem_index, stem_name in enumerate(packed_stem_order)
+            stem_name: stem_index
+            for stem_index, stem_name in enumerate(packed_stem_order)
         }
 
         reordered_waveforms: list[torch.Tensor] = []
@@ -314,7 +331,9 @@ class ChordBoundaryTeacher:
         ]
         return torch.cat(padded, dim=0)
 
-    def _infer_boundary_probabilities(self, waveform: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _infer_boundary_probabilities(
+        self, waveform: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         長い曲でも推論できるよう、少し重なりを持たせた chunk ごとに処理する。
         keep するのは各 chunk の中央部だけにして、境界付近の不安定さを抑える。
@@ -325,7 +344,9 @@ class ChordBoundaryTeacher:
             empty = waveform.new_zeros(0, dtype=torch.float32)
             return empty, empty
 
-        chunk_samples = max(self.n_fft, int(round(self.chunk_seconds * self.sample_rate)))
+        chunk_samples = max(
+            self.n_fft, int(round(self.chunk_seconds * self.sample_rate))
+        )
         overlap_samples = int(round(self.overlap_seconds * self.sample_rate))
         step_samples = max(self.n_fft, chunk_samples - (2 * overlap_samples))
 
@@ -351,8 +372,12 @@ class ChordBoundaryTeacher:
 
             with torch.inference_mode():
                 outputs = self.model(chunk_waveform.unsqueeze(0).to(self.device))
-                boundary_logits = outputs["initial_boundary_logits"].squeeze(0).squeeze(-1)
-                boundary_probabilities = torch.sigmoid(boundary_logits).to(torch.float32).cpu()
+                boundary_logits = (
+                    outputs["initial_boundary_logits"].squeeze(0).squeeze(-1)
+                )
+                boundary_probabilities = (
+                    torch.sigmoid(boundary_logits).to(torch.float32).cpu()
+                )
 
             frame_times = (
                 torch.arange(
@@ -398,12 +423,18 @@ class ChordBoundaryTeacher:
             padding=self.nms_window_radius,
         ).view(-1)
         candidate_indices = (
-            (boundary_probabilities >= self.boundary_threshold)
-            & (boundary_probabilities == pooled)
-        ).nonzero(as_tuple=False).squeeze(-1)
+            (
+                (boundary_probabilities >= self.boundary_threshold)
+                & (boundary_probabilities == pooled)
+            )
+            .nonzero(as_tuple=False)
+            .squeeze(-1)
+        )
 
         if candidate_indices.numel() == 0:
-            return boundary_probabilities.new_zeros(0), boundary_probabilities.new_zeros(0)
+            return boundary_probabilities.new_zeros(
+                0
+            ), boundary_probabilities.new_zeros(0)
 
         ordered = torch.argsort(
             boundary_probabilities.index_select(0, candidate_indices),
@@ -412,7 +443,10 @@ class ChordBoundaryTeacher:
         selected: list[int] = []
         for order_index in ordered.tolist():
             candidate = int(candidate_indices[order_index].item())
-            if any(abs(candidate - existing) < self.min_boundary_distance_frames for existing in selected):
+            if any(
+                abs(candidate - existing) < self.min_boundary_distance_frames
+                for existing in selected
+            ):
                 continue
             selected.append(candidate)
 
@@ -470,7 +504,9 @@ class ChordBoundaryTeacher:
             )
 
         total_samples = int(waveform.shape[-1])
-        chunk_samples = max(self.n_fft, int(round(self.chunk_seconds * self.sample_rate)))
+        chunk_samples = max(
+            self.n_fft, int(round(self.chunk_seconds * self.sample_rate))
+        )
         overlap_samples = int(round(self.overlap_seconds * self.sample_rate))
         step_samples = max(self.n_fft, chunk_samples - (2 * overlap_samples))
         chunk_starts: list[int] = []
@@ -503,8 +539,12 @@ class ChordBoundaryTeacher:
 
             with torch.inference_mode():
                 outputs = self.model(chunk_waveform.unsqueeze(0).to(self.device))
-                boundary_logits = outputs["initial_boundary_logits"].squeeze(0).squeeze(-1)
-                boundary_probabilities = torch.sigmoid(boundary_logits).to(torch.float32).cpu()
+                boundary_logits = (
+                    outputs["initial_boundary_logits"].squeeze(0).squeeze(-1)
+                )
+                boundary_probabilities = (
+                    torch.sigmoid(boundary_logits).to(torch.float32).cpu()
+                )
 
             frame_times = (
                 torch.arange(

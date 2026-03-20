@@ -21,10 +21,16 @@ if __package__ is None or __package__ == "":
         sys.path.insert(0, str(project_root))
 
 from models import AudioFeatureExtractor, Backbone
-from pretraining.contrastive import PLPContrastiveLoss
-from pretraining.model import PLPContrastiveBackboneModel
-from pretraining.plp_teacher import PLPPseudoTeacher
-from pretraining.unlabeled_dataset import UnlabeledStemDataset
+from pretraining.augmentations import (
+    keep_only_stems,
+)
+from pretraining.contrastive import DrumContrastiveObjective
+from pretraining.masked_segment_model import compute_masked_segment_loss
+from pretraining.model import DrumContrastiveModel
+from pretraining.unlabeled_dataset import (
+    UnlabeledStemDataset,
+    collate_unlabeled_stem_batch,
+)
 from training.losses import ShiftTolerantBCELoss
 
 
@@ -67,7 +73,6 @@ class WarmupCosineScheduler:
     def _lr_multiplier(self, step_index: int) -> float:
         if self.warmup_steps > 0 and step_index < self.warmup_steps:
             return max(1e-8, float(step_index + 1) / float(self.warmup_steps))
-
         if self.total_steps <= self.warmup_steps:
             return 1.0
 
@@ -111,39 +116,51 @@ class ResumeState:
 
 @dataclass
 class TrainingComponents:
-    """学習ループが必要とする部品をまとめて保持する。"""
-
     dataset: UnlabeledStemDataset
     train_loader: DataLoader
-    model: PLPContrastiveBackboneModel
-    teacher: PLPPseudoTeacher
-    criterion: PLPContrastiveLoss
+    model: DrumContrastiveModel
+    objective: DrumContrastiveObjective
     chord_boundary_loss_fn: ShiftTolerantBCELoss
     chord_boundary_loss_weight: float
+    masked_segment_loss_weight: float
     optimizer: torch.optim.Optimizer
     scheduler: Optional[WarmupCosineScheduler]
     scaler: torch.amp.GradScaler
+    drums_stem_index: int
+    num_stems: int
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="PLP-guided contrastive self-supervised pretraining for Backbone"
+        description="Drum-contrastive + chord-boundary self-supervised pretraining for Backbone"
     )
+    # dataset / cache 周り
     parser.add_argument(
-        "--dataset-root",
-        type=Path,
-        default=Path("dataset/unlabeled_dataset"),
+        "--dataset-root", type=Path, default=Path("dataset/unlabeled_dataset")
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("outputs/ssl_plp_pretrain"),
+        default=Path("outputs/ssl_drum_contrastive_pretrain"),
     )
     parser.add_argument(
         "--manifest-path",
         type=Path,
         default=None,
-        help="無ラベル stem dataset の manifest JSON。未指定なら <dataset-root>/.unlabeled_stem_manifest.json を使う。",
+        help="無ラベル stem dataset の manifest JSON。",
+    )
+    parser.add_argument(
+        "--audio-backend",
+        type=str,
+        choices=("wav", "packed"),
+        default="wav",
+        help="入力音声の読込元。packed を使うと songs_packed の npy/json を読みます。",
+    )
+    parser.add_argument(
+        "--packed-audio-dir",
+        type=Path,
+        default=None,
+        help="packed 音声ディレクトリ。未指定なら <dataset-root>/songs_packed を使います。",
     )
     parser.add_argument(
         "--rebuild-manifest",
@@ -154,26 +171,36 @@ def parse_args() -> argparse.Namespace:
         "--resume",
         type=Path,
         default=None,
-        help="Resume pretraining from a checkpoint produced by this script.",
+        help="このスクリプトが出力した checkpoint から学習再開する。",
     )
     parser.add_argument(
         "--init-from",
         type=Path,
         default=Path("model_epoch_200.pt"),
-        help="Initial checkpoint to load backbone weights from before SSL pretraining.",
+        help="事前学習前の backbone 初期値として読む checkpoint。",
     )
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--prefetch-factor", type=int, default=4)
     parser.add_argument("--disable-persistent-workers", action="store_true")
-    parser.add_argument("--disable-file-handle-cache", action="store_true")
+    parser.add_argument(
+        "--disable-file-handle-cache",
+        action="store_true",
+        help="WAV handle / packed memmap cache を無効化する。",
+    )
     parser.add_argument("--max-open-files", type=int, default=64)
     parser.add_argument(
         "--chord-boundary-cache-dir",
         type=Path,
         default=None,
-        help="事前推論済み chord boundary cache。未指定なら教師なしで動く。",
+        help="事前推論済み chord boundary cache。未指定なら <dataset-root>/.chord_boundary_cache を自動検出する。",
+    )
+    parser.add_argument(
+        "--prototype-cache-dir",
+        type=Path,
+        default=None,
+        help="事前計算済み segment prototype cache。未指定なら <dataset-root>/.segment_prototype_cache を自動検出する。",
     )
     parser.add_argument("--train-samples-per-epoch", type=int, default=1024)
     parser.add_argument("--segment-seconds", type=float, default=30.0)
@@ -182,13 +209,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hop-length", type=int, default=441)
     parser.add_argument("--bins-per-octave", type=int, default=36)
     parser.add_argument("--n-bins", type=int, default=252)
+
+    # model / optimizer
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--output-dim", type=int, default=256)
     parser.add_argument("--num-layers", type=int, default=6)
     parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--projection-dim", type=int, default=128)
+    parser.add_argument("--head-dropout", type=float, default=0.1)
     parser.add_argument("--projection-hidden-dim", type=int, default=256)
-    parser.add_argument("--projector-dropout", type=float, default=0.1)
+    parser.add_argument("--rhythm-dim", type=int, default=128)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--grad-clip", type=float, default=1.0)
@@ -201,102 +230,62 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup-epochs", type=float, default=2.0)
     parser.add_argument("--min-lr-ratio", type=float, default=0.1)
     parser.add_argument("--temperature", type=float, default=0.1)
-    parser.add_argument(
-        "--positive-multiples",
-        "--positive-offsets",
-        dest="positive_multiples",
-        type=int,
-        nargs="+",
-        default=[1, 2],
-        help="局所 tau に対する positive 倍数。既定値は ±tau, ±2tau。",
-    )
-    parser.add_argument(
-        "--tau-neighborhood",
-        type=int,
-        default=2,
-        help="anchor 周辺の inter-peak interval を何個ぶん見て局所 tau を見積もるか。",
-    )
-    parser.add_argument(
-        "--positive-tolerance-ratio",
-        type=float,
-        default=0.25,
-        help="positive 距離判定の許容幅を tau 倍率で与える。",
-    )
-    parser.add_argument(
-        "--positive-tolerance-frames",
-        type=int,
-        default=2,
-        help="positive 距離判定の最小許容幅 [frames]。",
-    )
-    parser.add_argument(
-        "--negative-safety-radius-frames",
-        "--negative-safety-radius",
-        dest="negative_safety_radius_frames",
-        type=int,
-        default=4,
-        help="negative を除外する最小 frame 距離。",
-    )
-    parser.add_argument(
-        "--negative-safety-radius-ratio",
-        type=float,
-        default=0.5,
-        help="局所 tau に対する negative 安全半径の倍率。",
-    )
-    parser.add_argument("--num-negatives", type=int, default=32)
-    parser.add_argument("--max-anchors-per-sample", type=int, default=64)
-    parser.add_argument(
-        "--anchor-sampling",
-        type=str,
-        choices=("weighted_random", "random", "topk"),
-        default="weighted_random",
-        help="contrastive anchor の選び方。",
-    )
+    parser.add_argument("--rhythm-drum-weight", type=float, default=1.0)
+
+    # auxiliary SSL targets
     parser.add_argument(
         "--chord-boundary-loss-weight",
         type=float,
-        default=5.0,
+        default=1.0,
         help="事前推論済み chord boundary を使う補助 loss の重み。",
     )
     parser.add_argument(
-        "--chord-boundary-pos-weight",
+        "--masked-segment-loss-weight",
         type=float,
-        default=5.0,
-        help="chord boundary BCE の positive weight。",
+        default=1.0,
+        help="segment prototype を使う masked segment prediction loss の重み。",
     )
     parser.add_argument(
-        "--chord-boundary-tolerance",
-        type=int,
-        default=2,
-        help="chord boundary BCE が許容するフレームずれ幅。",
+        "--masked-segment-target-loss",
+        type=str,
+        choices=("bce", "kl"),
+        default="bce",
+        help="prototype soft target に対する損失。",
     )
-    parser.add_argument("--plp-win-length", type=int, default=192)
-    parser.add_argument("--plp-tempo-min", type=float, default=30.0)
-    parser.add_argument("--plp-tempo-max", type=float, default=300.0)
     parser.add_argument(
-        "--plp-dominant-tempo-radius",
+        "--segment-mask-ratio",
+        type=float,
+        default=0.4,
+        help="visible segment のうち mask する比率。",
+    )
+    parser.add_argument(
+        "--segment-min-masks-per-sample",
         type=int,
         default=1,
-        help="卓越テンポ bin の前後何 bin まで残すか。0 なら従来どおり 1 bin のみ。",
-    )
-    parser.add_argument("--plp-peak-threshold", type=float, default=0.3)
-    parser.add_argument(
-        "--plp-peak-smooth-kernel",
-        type=int,
-        default=9,
-        help="PLP pulse を平滑化する kernel サイズ。",
+        help="各 sample で最低限 mask する segment 数。",
     )
     parser.add_argument(
-        "--plp-peak-baseline-kernel",
+        "--segment-predictor-hidden-dim",
         type=int,
-        default=31,
-        help="局所ベースラインを作る kernel サイズ。",
+        default=256,
+        help="segment prototype head の hidden dim。",
     )
     parser.add_argument(
-        "--plp-min-peak-distance",
+        "--min-visible-segments",
         type=int,
-        default=None,
-        help="Peak distance in frames. If omitted, a tempo-aware default is used.",
+        default=2,
+        help="prototype supervision 有効時、crop 内に最低限含めたい segment 数。",
     )
+    parser.add_argument(
+        "--sample-retry-count",
+        type=int,
+        default=8,
+        help="visible segment 数を増やすため start offset を引き直す回数。",
+    )
+    parser.add_argument("--chord-boundary-pos-weight", type=float, default=5.0)
+    parser.add_argument("--chord-boundary-tolerance", type=int, default=2)
+
+    # runtime
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--device",
@@ -334,23 +323,56 @@ def log_scalar_metrics(
         writer.add_scalar(f"{prefix}/{key}", value, step)
 
 
+def sample_nonzero_integer(max_abs_value: int) -> int:
+    if max_abs_value <= 0:
+        return 0
+    candidates = [
+        value for value in range(-max_abs_value, max_abs_value + 1) if value != 0
+    ]
+    return random.choice(candidates)
+
+
+def scaled_backward(
+    scaler: torch.amp.GradScaler,
+    loss: torch.Tensor,
+    *,
+    retain_graph: bool = False,
+) -> None:
+    """AMP の有無を隠蔽しつつ loss を逐次 backward する。"""
+
+    if not loss.requires_grad:
+        return
+    scaler.scale(loss).backward(retain_graph=retain_graph)
+
+
 def build_training_components(
     args: argparse.Namespace,
     device: torch.device,
 ) -> TrainingComponents:
-    """
-    データ・モデル・最適化器を一箇所で組み立てる。
-    main から学習準備の流れが追いやすいよう、初期化処理をここへ集約する。
-    """
-
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
+    if (
+        args.chord_boundary_loss_weight <= 0.0
+        and args.rhythm_drum_weight <= 0.0
+        and args.masked_segment_loss_weight <= 0.0
+    ):
+        raise ValueError("At least one SSL objective must be enabled")
 
+    # cache は既定位置を自動検出し、masked segment が有効なときだけ prototype を必須にする。
     chord_boundary_cache_dir = args.chord_boundary_cache_dir
     if chord_boundary_cache_dir is None:
         default_boundary_cache_dir = args.dataset_root / ".chord_boundary_cache"
         if default_boundary_cache_dir.exists():
             chord_boundary_cache_dir = default_boundary_cache_dir
+    prototype_cache_dir = args.prototype_cache_dir
+    if prototype_cache_dir is None and args.masked_segment_loss_weight > 0.0:
+        default_prototype_cache_dir = args.dataset_root / ".segment_prototype_cache"
+        if default_prototype_cache_dir.exists():
+            prototype_cache_dir = default_prototype_cache_dir
+    if args.masked_segment_loss_weight > 0.0 and prototype_cache_dir is None:
+        raise ValueError(
+            "masked segment loss is enabled, but no prototype cache was found."
+        )
 
     dataset = UnlabeledStemDataset(
         dataset_root=args.dataset_root,
@@ -359,17 +381,31 @@ def build_training_components(
         hop_length=args.hop_length,
         n_fft=args.n_fft,
         samples_per_epoch=args.train_samples_per_epoch,
+        audio_backend=args.audio_backend,
+        packed_audio_dir=args.packed_audio_dir,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
         manifest_path=args.manifest_path,
         rebuild_manifest=args.rebuild_manifest,
         chord_boundary_cache_dir=chord_boundary_cache_dir,
+        prototype_cache_dir=prototype_cache_dir,
+        min_visible_segments=args.min_visible_segments,
+        sample_retry_count=args.sample_retry_count,
     )
+    if "drums" not in dataset.stem_names:
+        raise ValueError("Drum-Contrastive SSL requires a 'drums' stem in the dataset")
+    if args.masked_segment_loss_weight > 0.0 and dataset.num_prototypes <= 0:
+        raise ValueError(
+            "masked segment loss is enabled, but the prototype cache did not expose any prototypes"
+        )
 
+    # dataset 側は crop 済み音声と、boundary / segment prototype の両方を返す。
+    drums_stem_index = dataset.stem_names.index("drums")
     loader_kwargs = {
         "shuffle": False,
         "num_workers": args.num_workers,
         "pin_memory": False,
+        "collate_fn": collate_unlabeled_stem_batch,
     }
     if args.num_workers > 0:
         loader_kwargs["persistent_workers"] = not args.disable_persistent_workers
@@ -394,38 +430,22 @@ def build_training_components(
         dropout=args.dropout,
         use_gradient_checkpoint=True,
     )
-    model = PLPContrastiveBackboneModel(
+    model = DrumContrastiveModel(
         backbone=backbone,
-        projection_dim=args.projection_dim,
+        rhythm_dim=args.rhythm_dim,
         projection_hidden_dim=args.projection_hidden_dim,
-        projector_dropout=args.projector_dropout,
+        head_dropout=args.head_dropout,
+        num_segment_prototypes=(
+            dataset.num_prototypes if args.masked_segment_loss_weight > 0.0 else 0
+        ),
+        segment_mask_ratio=args.segment_mask_ratio,
+        segment_min_masks_per_sample=args.segment_min_masks_per_sample,
+        segment_predictor_hidden_dim=args.segment_predictor_hidden_dim,
     ).to(device)
 
-    teacher = PLPPseudoTeacher(
-        sample_rate=args.sample_rate,
-        hop_length=args.hop_length,
-        n_fft=args.n_fft,
-        win_length=args.plp_win_length,
-        tempo_min=args.plp_tempo_min,
-        tempo_max=args.plp_tempo_max,
-        dominant_tempo_radius=args.plp_dominant_tempo_radius,
-        peak_threshold=args.plp_peak_threshold,
-        peak_smooth_kernel=args.plp_peak_smooth_kernel,
-        peak_local_baseline_kernel=args.plp_peak_baseline_kernel,
-        min_peak_distance=args.plp_min_peak_distance,
-    ).to(device)
-
-    criterion = PLPContrastiveLoss(
+    objective = DrumContrastiveObjective(
         temperature=args.temperature,
-        positive_multiples=args.positive_multiples,
-        tau_neighborhood=args.tau_neighborhood,
-        positive_tolerance_ratio=args.positive_tolerance_ratio,
-        positive_tolerance_frames=args.positive_tolerance_frames,
-        negative_safety_radius_ratio=args.negative_safety_radius_ratio,
-        negative_safety_radius_frames=args.negative_safety_radius_frames,
-        num_negatives=args.num_negatives,
-        max_anchors_per_sample=args.max_anchors_per_sample,
-        anchor_sampling=args.anchor_sampling,
+        rhythm_drum_weight=args.rhythm_drum_weight,
     )
     chord_boundary_loss_fn = ShiftTolerantBCELoss(
         pos_weight=args.chord_boundary_pos_weight,
@@ -459,25 +479,22 @@ def build_training_components(
         dataset=dataset,
         train_loader=train_loader,
         model=model,
-        teacher=teacher,
-        criterion=criterion,
+        objective=objective,
         chord_boundary_loss_fn=chord_boundary_loss_fn,
         chord_boundary_loss_weight=float(args.chord_boundary_loss_weight),
+        masked_segment_loss_weight=float(args.masked_segment_loss_weight),
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=scaler,
+        drums_stem_index=drums_stem_index,
+        num_stems=len(dataset.stem_names),
     )
 
 
 def initialize_backbone_from_checkpoint(
-    model: PLPContrastiveBackboneModel,
+    model: DrumContrastiveModel,
     checkpoint_path: Path,
 ) -> dict[str, object]:
-    """
-    supervised 用 checkpoint でも SSL checkpoint でも読めるように、
-    backbone 部分だけを抽出して初期化する。
-    """
-
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     if not isinstance(checkpoint, dict):
         raise ValueError("Unsupported checkpoint format")
@@ -535,17 +552,12 @@ def save_checkpoint(
     path: Path,
     epoch: int,
     global_step: int,
-    model: PLPContrastiveBackboneModel,
+    model: DrumContrastiveModel,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[WarmupCosineScheduler],
     args: argparse.Namespace,
     metrics: dict[str, float],
 ) -> None:
-    """
-    既存 supervised 学習からも読みやすいよう、
-    `model_state_dict` には `backbone.*` 付きで保存する。
-    """
-
     path.parent.mkdir(parents=True, exist_ok=True)
     exported_backbone_state = {
         f"backbone.{key}": value.detach().cpu()
@@ -554,7 +566,7 @@ def save_checkpoint(
     checkpoint = {
         "epoch": epoch,
         "global_step": global_step,
-        "task": "ssl_plp_pretrain",
+        "task": "ssl_drum_contrastive_pretrain",
         "model_state_dict": exported_backbone_state,
         "backbone_state_dict": model.backbone.state_dict(),
         "pretrain_state_dict": model.state_dict(),
@@ -568,7 +580,7 @@ def save_checkpoint(
 
 def load_resume_state(
     checkpoint_path: Path,
-    model: PLPContrastiveBackboneModel,
+    model: DrumContrastiveModel,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[WarmupCosineScheduler],
 ) -> ResumeState:
@@ -576,7 +588,7 @@ def load_resume_state(
     pretrain_state = checkpoint.get("pretrain_state_dict")
     if not isinstance(pretrain_state, dict):
         raise ValueError(
-            "resume checkpoint must contain pretrain_state_dict produced by train_ssl_plp.py"
+            "resume checkpoint must contain pretrain_state_dict produced by train_ssl_disentangle.py"
         )
 
     model.load_state_dict(pretrain_state, strict=True)
@@ -600,77 +612,186 @@ def load_resume_state(
 
 def train_one_epoch(
     components: TrainingComponents,
+    args: argparse.Namespace,
     device: torch.device,
     global_step: int,
     log_interval: int,
     writer: Optional[SummaryWriter],
-    grad_clip: float,
 ) -> tuple[dict[str, float], int]:
-    """
-    1 epoch の本体。
-    各 batch で
-    1. 無ラベル波形から PLP 教師を作る
-    2. Backbone から埋め込みを作る
-    3. contrastive loss で更新する
-    という流れを順番に追えるようにしている。
-    """
-
     components.model.train()
     averager = MetricAverager()
     progress = tqdm(components.train_loader, desc="train", leave=False)
 
     for step_index, batch in enumerate(progress, start=1):
+        components.optimizer.zero_grad(set_to_none=True)
         batch = {
             key: value.to(device, non_blocking=True)
             if torch.is_tensor(value)
             else value
             for key, value in batch.items()
         }
-        valid_frames = batch["valid_frames"]
+        mix_waveform = batch.pop("waveform")
         valid_mask = batch["valid_mask"]
 
-        # PLP は教師信号生成だけなので勾配は不要。
-        with torch.no_grad():
-            teacher_output = components.teacher(batch["waveform"], valid_frames)
+        zero = mix_waveform.new_zeros(())
+        chord_boundary_loss = zero
+        rhythm_drum_loss = zero
+        masked_segment_loss = zero
 
-        components.optimizer.zero_grad(set_to_none=True)
+        # mix の feature extractor は一度だけ回して context を使い回す。
+        # これで「メモリ節約のための mix 再 forward」は維持しつつ、前段計算の重複を減らす。
+        with torch.no_grad():
+            mix_context = components.model.backbone.feature_extractor(mix_waveform)
+
+        drum_enabled = components.objective.rhythm_drum_weight > 0.0
+        base_enabled = components.chord_boundary_loss_weight > 0.0
+        masked_segment_enabled = components.masked_segment_loss_weight > 0.0
+
+        base_loss = zero
+        mix_output = None
+        need_mix_output = base_enabled or drum_enabled or masked_segment_enabled
         with torch.amp.autocast(
             device_type=device.type,
             enabled=components.scaler.is_enabled(),
         ):
-            model_output = components.model(batch["waveform"])
-            contrastive_loss, loss_metrics = components.criterion(
-                embeddings=model_output.embeddings,
-                peak_mask=teacher_output.peak_mask,
-                peak_values=teacher_output.peak_values,
-                valid_mask=valid_mask,
-            )
-            chord_boundary_loss = contrastive_loss.detach().new_zeros(())
-            if components.chord_boundary_loss_weight > 0.0:
-                chord_boundary_loss = components.chord_boundary_loss_fn(
-                    preds=model_output.chord_boundary_logits,
-                    targets=batch["chord_boundary_target"],
-                    mask=batch["chord_boundary_mask"],
+            if need_mix_output:
+                # 1 回目の mix forward では、boundary と masked segment を同時に処理する。
+                # boundary も masked 入力から出すので、augmentation 的な頑健化として働く。
+                mix_output = components.model(
+                    mix_waveform,
+                    valid_mask=valid_mask,
+                    backbone_context=mix_context,
+                    segment_start_frames=(
+                        batch["segment_start_frames"]
+                        if masked_segment_enabled
+                        else None
+                    ),
+                    segment_inner_start_frames=(
+                        batch["segment_inner_start_frames"]
+                        if masked_segment_enabled
+                        else None
+                    ),
+                    segment_inner_end_frames=(
+                        batch["segment_inner_end_frames"]
+                        if masked_segment_enabled
+                        else None
+                    ),
+                    segment_valid_mask=(
+                        batch["segment_valid_mask"] if masked_segment_enabled else None
+                    ),
                 )
-            loss = contrastive_loss + (
-                components.chord_boundary_loss_weight * chord_boundary_loss
+
+                if base_enabled:
+                    chord_boundary_loss = components.chord_boundary_loss_fn(
+                        preds=mix_output.chord_boundary_logits,
+                        targets=batch["chord_boundary_target"],
+                        mask=batch["chord_boundary_mask"],
+                    )
+                    base_loss = base_loss + (
+                        components.chord_boundary_loss_weight * chord_boundary_loss
+                    )
+
+                if (
+                    masked_segment_enabled
+                    and mix_output.segment_logits is not None
+                    and mix_output.masked_segment_mask is not None
+                    and mix_output.segment_valid_mask is not None
+                ):
+                    effective_segment_mask = (
+                        mix_output.masked_segment_mask & mix_output.segment_valid_mask
+                    )
+                    masked_segment_loss = compute_masked_segment_loss(
+                        logits=mix_output.segment_logits,
+                        targets=batch["segment_target_probs"],
+                        masked_segment_mask=effective_segment_mask,
+                        target_loss=args.masked_segment_target_loss,
+                    )
+                    base_loss = base_loss + (
+                        components.masked_segment_loss_weight * masked_segment_loss
+                    )
+                else:
+                    effective_segment_mask = batch["segment_valid_mask"].new_zeros(
+                        batch["segment_valid_mask"].shape
+                    )
+            else:
+                effective_segment_mask = batch["segment_valid_mask"].new_zeros(
+                    batch["segment_valid_mask"].shape
+                )
+
+        # base loss はここで先に backward して graph を捨てる。
+        # drum contrastive が有効なときだけ、後段で mix を再 forward してメモリを節約する。
+        base_did_backward = bool(base_loss.requires_grad)
+        if base_did_backward:
+            scaled_backward(
+                components.scaler,
+                base_loss,
+                retain_graph=False,
+            )
+            del mix_output
+            mix_output = None
+
+        if drum_enabled:
+            with torch.no_grad():
+                drums_waveform = keep_only_stems(
+                    mix_waveform,
+                    num_stems=components.num_stems,
+                    keep_stem_indices=[components.drums_stem_index],
+                )
+            with torch.amp.autocast(
+                device_type=device.type,
+                enabled=components.scaler.is_enabled(),
+            ):
+                if mix_output is None:
+                    # base loss で graph を破棄した後、contrastive 用にだけ mix を再構築する。
+                    mix_output = components.model(
+                        mix_waveform,
+                        valid_mask=valid_mask,
+                        backbone_context=mix_context,
+                    )
+                drums_output = components.model(drums_waveform, valid_mask=valid_mask)
+                rhythm_drum_loss = components.objective.rhythm_drum_weight * (
+                    components.objective._info_nce_loss(
+                        mix_output.rhythm_summary,
+                        drums_output.rhythm_summary,
+                    )
+                )
+            scaled_backward(
+                components.scaler,
+                rhythm_drum_loss,
+                retain_graph=False,
             )
 
-        components.scaler.scale(loss).backward()
-        if grad_clip > 0:
-            components.scaler.unscale_(components.optimizer)
-            torch.nn.utils.clip_grad_norm_(components.model.parameters(), grad_clip)
-        components.scaler.step(components.optimizer)
-        components.scaler.update()
-        if components.scheduler is not None:
-            components.scheduler.step()
+            del drums_waveform
+            del drums_output
 
-        global_step += 1
-        teacher_metrics = {
-            "plp_peak_count": float(
-                teacher_output.peak_mask.sum(dim=1).mean().detach()
-            ),
-            "plp_pulse_mean": float(teacher_output.pulse.mean().detach()),
+        did_step = base_did_backward or bool(rhythm_drum_loss.requires_grad)
+
+        ssl_loss = rhythm_drum_loss + (
+            components.masked_segment_loss_weight * masked_segment_loss
+        )
+        loss = base_loss + rhythm_drum_loss
+
+        ssl_metrics = {
+            "ssl_loss": float(ssl_loss.detach()),
+            "rhythm_drum_loss": float(rhythm_drum_loss.detach()),
+            "masked_segment_loss": float(masked_segment_loss.detach()),
+        }
+
+        if did_step and args.grad_clip > 0:
+            components.scaler.unscale_(components.optimizer)
+            torch.nn.utils.clip_grad_norm_(
+                components.model.parameters(), args.grad_clip
+            )
+        if did_step:
+            components.scaler.step(components.optimizer)
+            components.scaler.update()
+            if components.scheduler is not None:
+                components.scheduler.step()
+            global_step += 1
+        batch_metrics = {
+            "loss": float(loss.detach()),
+            "lr": float(components.optimizer.param_groups[0]["lr"]),
+            "chord_boundary_loss": float(chord_boundary_loss.detach()),
             "chord_boundary_events": float(
                 batch["chord_boundary_event_count"].to(torch.float32).mean().detach()
             ),
@@ -680,23 +801,36 @@ def train_one_epoch(
                 .mean()
                 .detach()
             ),
-        }
-        batch_metrics = {
-            "loss": float(loss.detach()),
-            "lr": float(components.optimizer.param_groups[0]["lr"]),
-            "chord_boundary_loss": float(chord_boundary_loss.detach()),
-            **loss_metrics,
-            **teacher_metrics,
+            "visible_segments": float(
+                batch["segment_valid_mask"].sum(dim=1).to(torch.float32).mean().detach()
+            ),
+            "masked_segments": float(
+                effective_segment_mask.sum(dim=1).to(torch.float32).mean().detach()
+            ),
+            "masked_segment_supervised_samples": float(
+                (batch["segment_valid_mask"].sum(dim=1) > 0)
+                .to(torch.float32)
+                .mean()
+                .detach()
+            ),
+            **ssl_metrics,
         }
         averager.update(batch_metrics)
-        log_scalar_metrics(writer, "train_step", batch_metrics, global_step)
+        if did_step:
+            log_scalar_metrics(writer, "train_step", batch_metrics, global_step)
 
         if step_index % max(1, log_interval) == 0:
             progress.set_postfix(
                 loss=f"{batch_metrics['loss']:.4f}",
-                pairs=f"{batch_metrics['contrastive_pairs']:.0f}",
-                peaks=f"{batch_metrics['plp_peak_count']:.1f}",
+                drum=f"{batch_metrics['rhythm_drum_loss']:.4f}",
+                seg=f"{batch_metrics['masked_segment_loss']:.4f}",
             )
+
+        del mix_waveform
+        del mix_context
+        del valid_mask
+        del mix_output
+        del batch
 
     return averager.averages(), global_step
 
@@ -746,17 +880,21 @@ def main() -> None:
         for epoch in range(start_epoch, args.epochs + 1):
             train_metrics, global_step = train_one_epoch(
                 components=components,
+                args=args,
                 device=device,
                 global_step=global_step,
                 log_interval=args.log_interval,
                 writer=writer,
-                grad_clip=args.grad_clip,
             )
 
-            # 履歴は jsonl へ追記して、後で supervised 移行時の比較にも使えるようにする。
             with history_path.open("a", encoding="utf-8") as fp:
                 fp.write(json.dumps({"epoch": epoch, "train": train_metrics}) + "\n")
             log_scalar_metrics(writer, "train_epoch", train_metrics, epoch)
+
+            metrics_text = ", ".join(
+                f"{key}={value:.4f}" for key, value in sorted(train_metrics.items())
+            )
+            print(f"epoch {epoch}: {metrics_text}")
 
             save_checkpoint(
                 path=args.output_dir / "checkpoint_last.pt",
@@ -768,7 +906,8 @@ def main() -> None:
                 args=args,
                 metrics=train_metrics,
             )
-            if args.save_every > 0 and epoch % args.save_every == 0:
+
+            if epoch % max(1, args.save_every) == 0:
                 save_checkpoint(
                     path=args.output_dir / f"model_epoch_{epoch}.pt",
                     epoch=epoch,
@@ -779,12 +918,8 @@ def main() -> None:
                     args=args,
                     metrics=train_metrics,
                 )
-
-            metric_text = ", ".join(
-                f"{key}={value:.4f}" for key, value in sorted(train_metrics.items())
-            )
-            print(f"epoch {epoch}: {metric_text}")
     finally:
+        components.dataset.close()
         writer.close()
 
 

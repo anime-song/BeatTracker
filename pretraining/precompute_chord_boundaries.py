@@ -85,9 +85,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_CHORD_TRANSCRIPTION_CONFIG,
     )
-    parser.add_argument(
-        "--device", type=str, default=None
-    )
+    parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--chunk-seconds", type=float, default=120.0)
     parser.add_argument("--overlap-seconds", type=float, default=8.0)
     parser.add_argument("--boundary-threshold", type=float, default=0.5)
@@ -168,7 +166,9 @@ def main() -> None:
         "dataset_root": str(args.dataset_root),
         "output_dir": str(output_dir),
         "audio_backend": args.audio_backend,
-        "packed_audio_dir": None if args.packed_audio_dir is None else str(args.packed_audio_dir),
+        "packed_audio_dir": None
+        if args.packed_audio_dir is None
+        else str(args.packed_audio_dir),
         "checkpoint_path": str(args.checkpoint_path),
         "config_path": str(args.config_path),
         "sample_rate": teacher.sample_rate,
@@ -195,7 +195,9 @@ def main() -> None:
         output_path = output_dir / f"{song.song_id}.pt"
         if output_path.exists() and not args.overwrite:
             if args.audacity_label_dir is not None:
-                payload = torch.load(output_path, map_location="cpu", weights_only=False)
+                payload = torch.load(
+                    output_path, map_location="cpu", weights_only=False
+                )
                 boundary_times_sec = payload.get("boundary_times_sec")
                 if torch.is_tensor(boundary_times_sec):
                     write_audacity_labels(

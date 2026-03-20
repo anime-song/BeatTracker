@@ -1,5 +1,4 @@
 from .chord_boundary_teacher import ChordBoundaryTeacher
-from .contrastive import PLPContrastiveLoss
-from .model import PLPContrastiveBackboneModel
-from .plp_teacher import PLPPseudoTeacher
+from .contrastive import DrumContrastiveObjective
+from .model import DrumContrastiveModel
 from .unlabeled_dataset import UnlabeledStemDataset
