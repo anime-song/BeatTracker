@@ -37,3 +37,4 @@ completion_order,run_name,completed_at_estimated,best_downbeat_f1,running_best_d
 36,exp_meter_from_rhythm_hardpred_w0_01,2026-03-17 02:45:02 UTC,0.4463,0.4705
 37,from_ssl_pretrain,2026-03-18 01:44:50 UTC,0.3605,0.4705
 38,from_ssl_plp_with_chord_boundary,2026-03-19 02:41:09 UTC,0.4894,0.4894
+39,from_ssl_drum_constrastive_pretrain,2026-03-20 13:06:27 UTC,0.4975,0.4975

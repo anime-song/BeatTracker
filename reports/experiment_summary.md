@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-19 02:51:09 UTC
+Generated: 2026-03-20 13:07:04 UTC
 
-Runs: 38
+Runs: 40
 
 ## Progress
 
@@ -12,6 +12,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | stem_drop | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| from_ssl_drum_constrastive_pretrain | complete | 21 | 0.4975 | 30 | 0.4738 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | from_ssl_plp_with_chord_boundary | complete | 23 | 0.4894 | 30 | 0.4752 | 42 | 0.000300 | 8 | 0.050 | 0.100 | false | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm | complete | 23 | 0.4705 | 30 | 0.4444 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
@@ -50,6 +51,41 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| ssl_drum_contrastive_pretrain | complete | - | - | 100 | - | 42 | 0.000300 | 4 | - | - | - | - | - | L6/H64/O256 | - |
+
+## from_ssl_drum_constrastive_pretrain
+
+| field | value |
+| --- | --- |
+| path | outputs/from_ssl_drum_constrastive_pretrain |
+| status | complete |
+| best_epoch | 21 |
+| best_downbeat_f1 | 0.4975 |
+| best_beat_f1 | 0.6550 |
+| best_val_loss | 1.1521 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4738 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | outputs/ssl_drum_contrastive_pretrain/checkpoint_last.pt |
+| init_state_source | model_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/ssl-pretrain-plp |
+| git_commit | 0be03f234c6205941833dbd9a9d3539966336255 |
+| git_dirty | true |
 
 ## from_ssl_plp_with_chord_boundary
 
@@ -1342,3 +1378,37 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | git_branch | exp/meter-classification |
 | git_commit | bcef203d753b4517de3fc0dfb45e57021ac92e0e |
 | git_dirty | true |
+
+## ssl_drum_contrastive_pretrain
+
+| field | value |
+| --- | --- |
+| path | outputs/ssl_drum_contrastive_pretrain |
+| status | complete |
+| best_epoch | - |
+| best_downbeat_f1 | - |
+| best_beat_f1 | - |
+| best_val_loss | - |
+| last_epoch | 100 |
+| last_downbeat_f1 | - |
+| configured_epochs | 100 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 4 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | - |
+| drum_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
+| stem_dropout_max_count | - |
+| init_scope | - |
+| init_from | pretraining/assets/chord_transcription/model_epoch_200.pt |
+| init_state_source | - |
+| audio_backend | packed |
+| scheduler | cosine |
+| ema_decay | - |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | - |
+| git_commit | - |
+| git_dirty | - |
