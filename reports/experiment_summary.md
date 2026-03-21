@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-21 03:35:59 UTC
+Generated: 2026-03-21 10:25:23 UTC
 
-Runs: 42
+Runs: 44
 
 ## Progress
 
@@ -16,6 +16,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | from_ssl_drum_constrastive_pretrain | complete | 21 | 0.4975 | 30 | 0.4738 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | from_ssl_plp_with_chord_boundary | complete | 23 | 0.4894 | 30 | 0.4752 | 42 | 0.000300 | 8 | 0.050 | 0.100 | false | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm | complete | 23 | 0.4705 | 30 | 0.4444 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
+| from_ssl_pretrain_harmony_onset | complete | 14 | 0.4690 | 30 | 0.4120 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq | complete | 25 | 0.4642 | 30 | 0.4510 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-highfreq-flux-aux |
 | exp_chord_preinit_stemdrop2_drumaux | complete | 23 | 0.4598 | 30 | 0.4472 | 42 | 0.000300 | 8 | 0.050 | 0.100 | - | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/drum-aux-flux-onset |
 | exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar | complete | 21 | 0.4594 | 30 | 0.4370 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | exp/repeat-ssm-downbeat-consistency |
@@ -52,6 +53,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | exp_meter_classification_w0_0_5_specaug_f0_05_t0_00 | complete | 21 | 0.3146 | 30 | 0.2990 | 42 | 0.000300 | 8 | 0.050 | - | - | - | - | L6/H64/O256 | exp/spec-augment-mask-rate |
 | beat_transcription | complete | 21 | 0.3141 | 30 | 0.2986 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | exp_meter_classification | complete | 25 | 0.2561 | 30 | 0.2559 | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | exp/meter-classification |
+| ssl_pretrain_harmony_onset | complete | - | - | 100 | - | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | ssl_no_drum_contrastive_pretrain | complete | - | - | 100 | - | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | ssl_drum_contrastive_pretrain | complete | - | - | 100 | - | 42 | 0.000300 | 4 | - | - | - | - | - | L6/H64/O256 | - |
 
@@ -189,6 +191,40 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | resume | - |
 | git_branch | exp/repeat-ssm-downbeat-consistency |
 | git_commit | 2dc24e5d708fbff50b002dddfb08a16eb5dc2ee4 |
+| git_dirty | true |
+
+## from_ssl_pretrain_harmony_onset
+
+| field | value |
+| --- | --- |
+| path | outputs/from_ssl_pretrain_harmony_onset |
+| status | complete |
+| best_epoch | 14 |
+| best_downbeat_f1 | 0.4690 |
+| best_beat_f1 | 0.6023 |
+| best_val_loss | 1.1296 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.4120 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | outputs/ssl_pretrain_harmony_onset/checkpoint_last.pt |
+| init_state_source | model_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | exp/ssl-pretrain-plp |
+| git_commit | d44d541a72be93ff7067da95655447ca3059f901 |
 | git_dirty | true |
 
 ## exp_chord_preinit_stemdrop2_drumaux_highfreq
@@ -1414,6 +1450,40 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | git_branch | exp/meter-classification |
 | git_commit | bcef203d753b4517de3fc0dfb45e57021ac92e0e |
 | git_dirty | true |
+
+## ssl_pretrain_harmony_onset
+
+| field | value |
+| --- | --- |
+| path | outputs/ssl_pretrain_harmony_onset |
+| status | complete |
+| best_epoch | - |
+| best_downbeat_f1 | - |
+| best_beat_f1 | - |
+| best_val_loss | - |
+| last_epoch | 100 |
+| last_downbeat_f1 | - |
+| configured_epochs | 100 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | - |
+| drum_aux_loss_weight | - |
+| drum_aux_use_high_frequency_flux | - |
+| stem_dropout_max_count | - |
+| init_scope | - |
+| init_from | pretraining/assets/chord_transcription/model_epoch_200.pt |
+| init_state_source | - |
+| audio_backend | packed |
+| scheduler | cosine |
+| ema_decay | - |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | - |
+| git_commit | - |
+| git_dirty | - |
 
 ## ssl_no_drum_contrastive_pretrain
 

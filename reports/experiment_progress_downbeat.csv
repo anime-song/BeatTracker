@@ -39,3 +39,4 @@ completion_order,run_name,completed_at_estimated,best_downbeat_f1,running_best_d
 38,from_ssl_plp_with_chord_boundary,2026-03-19 02:41:09 UTC,0.4894,0.4894
 39,from_ssl_drum_constrastive_pretrain,2026-03-20 13:06:27 UTC,0.4975,0.4975
 40,from_ssl_no_drum_constrastive_pretrain,2026-03-21 03:27:34 UTC,0.5093,0.5093
+41,from_ssl_pretrain_harmony_onset,2026-03-21 09:52:48 UTC,0.4690,0.5093

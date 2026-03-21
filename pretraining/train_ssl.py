@@ -340,7 +340,10 @@ def build_training_components(
 ) -> TrainingComponents:
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
-    if args.chord_boundary_loss_weight <= 0.0 and args.masked_segment_loss_weight <= 0.0:
+    if (
+        args.chord_boundary_loss_weight <= 0.0
+        and args.masked_segment_loss_weight <= 0.0
+    ):
         raise ValueError("At least one SSL objective must be enabled")
 
     # cache は既定位置を自動検出し、masked segment が有効なときだけ prototype を必須にする。
@@ -350,13 +353,14 @@ def build_training_components(
         if default_boundary_cache_dir.exists():
             chord_boundary_cache_dir = default_boundary_cache_dir
     prototype_cache_dir = args.prototype_cache_dir
-    if prototype_cache_dir is None and args.masked_segment_loss_weight > 0.0:
+    use_segment_time_mask = args.masked_segment_loss_weight > 0.0
+    if prototype_cache_dir is None and use_segment_time_mask:
         default_prototype_cache_dir = args.dataset_root / ".segment_prototype_cache"
         if default_prototype_cache_dir.exists():
             prototype_cache_dir = default_prototype_cache_dir
-    if args.masked_segment_loss_weight > 0.0 and prototype_cache_dir is None:
+    if use_segment_time_mask and prototype_cache_dir is None:
         raise ValueError(
-            "masked segment loss is enabled, but no prototype cache was found."
+            "segment time mask is required, but no prototype cache was found."
         )
 
     dataset = UnlabeledStemDataset(
@@ -377,9 +381,9 @@ def build_training_components(
         min_visible_segments=args.min_visible_segments,
         sample_retry_count=args.sample_retry_count,
     )
-    if args.masked_segment_loss_weight > 0.0 and dataset.num_prototypes <= 0:
+    if use_segment_time_mask and dataset.num_prototypes <= 0:
         raise ValueError(
-            "masked segment loss is enabled, but the prototype cache did not expose any prototypes"
+            "segment time mask is required, but the prototype cache did not expose any prototypes"
         )
 
     # dataset 側は crop 済み音声と、boundary / segment prototype の両方を返す。
@@ -610,11 +614,11 @@ def train_one_epoch(
         masked_segment_loss = zero
         base_enabled = components.chord_boundary_loss_weight > 0.0
         masked_segment_enabled = components.masked_segment_loss_weight > 0.0
+        time_mask_enabled = masked_segment_enabled
 
         mix_context = None
-        if masked_segment_enabled:
-            # masked segment は Backbone 入力前に spec を欠損させるので、
-            # feature extractor だけ先に 1 回回して context を渡す。
+        if time_mask_enabled:
+            # 補助目標が時間マスクを共有するので、feature extractor は 1 回だけ回して再利用する。
             with torch.no_grad():
                 mix_context = components.model.backbone.feature_extractor(mix_waveform)
 
@@ -623,22 +627,21 @@ def train_one_epoch(
             device_type=device.type,
             enabled=components.scaler.is_enabled(),
         ):
+            # chord boundary / harmony prototype を同じ masked forward に同居させる。
             mix_output = components.model(
                 mix_waveform,
                 backbone_context=mix_context,
                 segment_start_frames=(
-                    batch["segment_start_frames"] if masked_segment_enabled else None
+                    batch["segment_start_frames"] if time_mask_enabled else None
                 ),
                 segment_inner_start_frames=(
-                    batch["segment_inner_start_frames"]
-                    if masked_segment_enabled
-                    else None
+                    batch["segment_inner_start_frames"] if time_mask_enabled else None
                 ),
                 segment_inner_end_frames=(
-                    batch["segment_inner_end_frames"] if masked_segment_enabled else None
+                    batch["segment_inner_end_frames"] if time_mask_enabled else None
                 ),
                 segment_valid_mask=(
-                    batch["segment_valid_mask"] if masked_segment_enabled else None
+                    batch["segment_valid_mask"] if time_mask_enabled else None
                 ),
             )
 
@@ -673,6 +676,15 @@ def train_one_epoch(
             else:
                 effective_segment_mask = batch["segment_valid_mask"].new_zeros(
                     batch["segment_valid_mask"].shape
+                )
+
+            if (
+                time_mask_enabled
+                and mix_output.masked_segment_mask is not None
+                and mix_output.segment_valid_mask is not None
+            ):
+                effective_segment_mask = (
+                    mix_output.masked_segment_mask & mix_output.segment_valid_mask
                 )
 
         did_step = bool(total_loss.requires_grad)

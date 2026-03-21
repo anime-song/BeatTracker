@@ -106,10 +106,10 @@ def build_masked_backbone_context(
             chosen = valid_indices[permutation[:target_mask_count]]
             masked_segment_mask[batch_index, chosen] = True
 
-    num_frames = int(context.spec.shape[2])
+    input_num_frames = int(context.spec.shape[2])
     batch_size = masked_segment_mask.shape[0]
     frame_mask = torch.zeros(
-        (batch_size, num_frames),
+        (batch_size, input_num_frames),
         dtype=torch.bool,
         device=masked_segment_mask.device,
     )
@@ -120,8 +120,8 @@ def build_masked_backbone_context(
         for segment_index in masked_indices.tolist():
             start_frame = int(mask_start_frames[batch_index, segment_index].item())
             end_frame = int(mask_end_frames[batch_index, segment_index].item())
-            start_frame = max(0, min(start_frame, num_frames))
-            end_frame = max(start_frame, min(end_frame, num_frames))
+            start_frame = max(0, min(start_frame, input_num_frames))
+            end_frame = max(start_frame, min(end_frame, input_num_frames))
             if end_frame > start_frame:
                 frame_mask[batch_index, start_frame:end_frame] = True
 

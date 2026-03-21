@@ -26,7 +26,7 @@ class PretrainingModelOutput:
 
 class PretrainingModel(nn.Module):
     """
-    共有 backbone から chord boundary と masked segment の補助 head を作る。
+    共有 backbone から chord boundary / masked segment の補助 head を作る。
     """
 
     def __init__(
@@ -40,6 +40,8 @@ class PretrainingModel(nn.Module):
     ) -> None:
         super().__init__()
         self.backbone = backbone
+        self.segment_mask_ratio = float(segment_mask_ratio)
+        self.segment_min_masks_per_sample = max(0, int(segment_min_masks_per_sample))
         self.chord_boundary_head = nn.Sequential(
             nn.LayerNorm(backbone.output_dim),
             nn.Linear(backbone.output_dim, 1),
@@ -93,8 +95,8 @@ class PretrainingModel(nn.Module):
                 segment_valid_mask=segment_valid_mask,
                 mask_start_frames=segment_inner_start_frames,
                 mask_end_frames=segment_inner_end_frames,
-                mask_ratio=self.segment_head.mask_ratio,
-                min_masks_per_sample=self.segment_head.min_masks_per_sample,
+                mask_ratio=self.segment_mask_ratio,
+                min_masks_per_sample=self.segment_min_masks_per_sample,
             )
             resolved_segment_valid_mask = segment_valid_mask
 
@@ -102,7 +104,11 @@ class PretrainingModel(nn.Module):
         chord_boundary_logits = self.chord_boundary_head(frame_features).squeeze(-1)
 
         segment_logits: Optional[torch.Tensor] = None
-        if segment_supervision_enabled and resolved_segment_valid_mask is not None:
+        if (
+            self.segment_head is not None
+            and segment_supervision_enabled
+            and resolved_segment_valid_mask is not None
+        ):
             segment_output = self.segment_head(
                 frame_features=frame_features,
                 segment_start_frames=segment_start_frames,

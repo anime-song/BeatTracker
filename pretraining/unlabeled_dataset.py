@@ -790,7 +790,6 @@ class UnlabeledStemDataset(Dataset):
             start_sec=start_sec,
             valid_frames=valid_frames,
         )
-
         return {
             "waveform": waveform,
             "valid_mask": valid_mask,
