@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import os
 import json
+import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -18,15 +18,12 @@ if __package__ is None or __package__ == "":
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
-from data import BeatStemDataset
-from data.beat_dataset import SongEntry
+from pretraining.unlabeled_dataset import UnlabeledSongEntry, UnlabeledStemDataset
 
 
 @dataclass(frozen=True)
 class PackTask:
     song_id: str
-    split: Optional[str]
-    semitone: int
     stem_names: tuple[str, ...]
     stem_paths: tuple[str, ...]
     expected_sample_rate: int
@@ -37,12 +34,12 @@ class PackTask:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="songs_separated 以下の stem WAV を、曲ごとの packed 配列へ事前変換します。"
+        description="unlabeled stem WAV を、曲ごとの packed 配列へ事前変換します。"
     )
     parser.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path("dataset/meter_dataset"),
+        default=Path("dataset/unlabeled_dataset"),
     )
     parser.add_argument(
         "--output-dir",
@@ -51,10 +48,15 @@ def parse_args() -> argparse.Namespace:
         help="未指定なら <dataset-root>/songs_packed を使います。",
     )
     parser.add_argument(
-        "--split",
-        type=str,
-        choices=("train", "val", "all"),
-        default="all",
+        "--manifest-path",
+        type=Path,
+        default=None,
+        help="既存の unlabeled manifest JSON。未指定なら <dataset-root>/.unlabeled_stem_manifest.json を使います。",
+    )
+    parser.add_argument(
+        "--rebuild-manifest",
+        action="store_true",
+        help="既存 manifest を無視して stem WAV を再走査します。",
     )
     parser.add_argument(
         "--song-id",
@@ -64,18 +66,6 @@ def parse_args() -> argparse.Namespace:
         help="特定の曲だけ変換したいときに繰り返し指定します。",
     )
     parser.add_argument("--song-limit", type=int, default=None)
-    parser.add_argument(
-        "--allowed-pitch-shifts",
-        type=int,
-        nargs="*",
-        default=None,
-        help="指定した semitone だけ変換します。未指定なら利用可能なものを全て対象にします。",
-    )
-    parser.add_argument(
-        "--exclude-original",
-        action="store_true",
-        help="オリジナル音源 (0 semitone) を packed 化しません。",
-    )
     parser.add_argument(
         "--dtype",
         type=str,
@@ -92,7 +82,7 @@ def parse_args() -> argparse.Namespace:
         "--jobs",
         type=int,
         default=max(1, min(4, os.cpu_count() or 1)),
-        help="並列に pack する variant 数です。ディスクが遅い場合は 2-4 程度が実用的です。",
+        help="並列に pack する曲数です。ディスクが遅い場合は 2-4 程度が実用的です。",
     )
     parser.add_argument(
         "--force",
@@ -110,7 +100,7 @@ def parse_args() -> argparse.Namespace:
         "--sample-rate",
         type=int,
         default=22050,
-        help="BeatStemDataset のメタデータ読込に使う値です。packed 出力自体は元の sample rate を保持します。",
+        help="UnlabeledStemDataset の manifest 読込に使う値です。packed 出力自体は元の sample rate を保持します。",
     )
     parser.add_argument("--hop-length", type=int, default=441)
     parser.add_argument("--n-fft", type=int, default=2048)
@@ -118,23 +108,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_split(split: str) -> Optional[str]:
-    if split == "all":
-        return None
-    return split
+def packed_file_stem(song_id: str) -> str:
+    return f"{song_id}_stems_pitch_0st"
 
 
-def packed_file_stem(song_id: str, semitone: int) -> str:
-    return f"{song_id}_stems_pitch_{semitone}st"
-
-
-def output_paths(output_dir: Path, song_id: str, semitone: int) -> tuple[Path, Path]:
+def output_paths(output_dir: Path, song_id: str) -> tuple[Path, Path]:
     song_output_dir = output_dir / song_id
-    file_stem = packed_file_stem(song_id, semitone)
+    file_stem = packed_file_stem(song_id)
     return song_output_dir / f"{file_stem}.npy", song_output_dir / f"{file_stem}.json"
 
 
-def select_songs(dataset: BeatStemDataset, args: argparse.Namespace) -> list[SongEntry]:
+def select_songs(
+    dataset: UnlabeledStemDataset,
+    args: argparse.Namespace,
+) -> list[UnlabeledSongEntry]:
     songs = dataset.songs
     if args.song_ids:
         requested_ids = set(args.song_ids)
@@ -144,42 +131,26 @@ def select_songs(dataset: BeatStemDataset, args: argparse.Namespace) -> list[Son
     return songs
 
 
-def select_semitones(song: SongEntry, args: argparse.Namespace) -> list[int]:
-    semitones = list(song.available_semitones)
-    if args.exclude_original:
-        semitones = [semitone for semitone in semitones if semitone != 0]
-    if args.allowed_pitch_shifts is not None:
-        allowed = {int(semitone) for semitone in args.allowed_pitch_shifts}
-        semitones = [semitone for semitone in semitones if semitone in allowed]
-    return sorted(semitones)
-
-
 def build_tasks(
-    songs: Iterable[SongEntry],
+    songs: Iterable[UnlabeledSongEntry],
     stem_names: tuple[str, ...],
-    args: argparse.Namespace,
+    output_dir: Path,
 ) -> list[PackTask]:
     tasks: list[PackTask] = []
-    output_dir = args.output_dir or (args.dataset_root / "songs_packed")
     for song in songs:
-        for semitone in select_semitones(song, args):
-            array_path, metadata_path = output_paths(output_dir, song.song_id, semitone)
-            stem_paths = tuple(
-                str(song.stems_by_semitone[semitone][stem_name]) for stem_name in stem_names
+        array_path, metadata_path = output_paths(output_dir, song.song_id)
+        stem_paths = tuple(str(song.stem_paths[stem_name]) for stem_name in stem_names)
+        tasks.append(
+            PackTask(
+                song_id=song.song_id,
+                stem_names=stem_names,
+                stem_paths=stem_paths,
+                expected_sample_rate=int(song.sample_rate),
+                expected_channels_per_stem=int(song.channels_per_stem),
+                output_array_path=str(array_path),
+                output_metadata_path=str(metadata_path),
             )
-            tasks.append(
-                PackTask(
-                    song_id=song.song_id,
-                    split=song.split,
-                    semitone=semitone,
-                    stem_names=stem_names,
-                    stem_paths=stem_paths,
-                    expected_sample_rate=int(song.sample_rate),
-                    expected_channels_per_stem=int(song.channels_per_stem),
-                    output_array_path=str(array_path),
-                    output_metadata_path=str(metadata_path),
-                )
-            )
+        )
     return tasks
 
 
@@ -205,11 +176,13 @@ def should_skip_existing(
 
     return (
         metadata.get("song_id") == task.song_id
-        and int(metadata.get("semitone", 9999)) == task.semitone
+        and int(metadata.get("semitone", 9999)) == 0
         and tuple(metadata.get("stem_names", [])) == task.stem_names
         and metadata.get("storage_dtype") == storage_dtype.name
         and int(metadata.get("sample_rate", -1)) == task.expected_sample_rate
-        and int(metadata.get("channels_per_stem", -1)) == task.expected_channels_per_stem
+        and int(metadata.get("channels_per_stem", -1))
+        == task.expected_channels_per_stem
+        and metadata.get("source_kind") == "unlabeled_dataset"
     )
 
 
@@ -225,7 +198,7 @@ def delete_task_source_stems(task: PackTask) -> int:
     return deleted_count
 
 
-def pack_song_variant(
+def pack_song(
     task: PackTask,
     storage_dtype: np.dtype,
     chunk_frames: int,
@@ -304,15 +277,14 @@ def pack_song_variant(
 
     metadata = {
         "song_id": task.song_id,
-        "split": task.split,
-        "semitone": task.semitone,
+        "semitone": 0,
         "sample_rate": sample_rate,
         "channels_per_stem": channels_per_stem,
         "num_channels": num_channels,
         "num_frames": num_frames,
         "storage_dtype": storage_dtype.name,
         "stem_names": list(task.stem_names),
-        "source_kind": "songs_separated",
+        "source_kind": "unlabeled_dataset",
     }
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     deleted_count = delete_task_source_stems(task) if delete_source_stems else 0
@@ -326,7 +298,7 @@ def execute_pack_task(
     force: bool,
     delete_source_stems: bool,
 ) -> tuple[str, str, int]:
-    status, array_path, deleted_count = pack_song_variant(
+    status, array_path, deleted_count = pack_song(
         task=task,
         storage_dtype=np.dtype(storage_dtype_name),
         chunk_frames=chunk_frames,
@@ -350,27 +322,31 @@ def main() -> None:
     storage_dtype = np.dtype(args.dtype)
     num_jobs = max(1, int(args.jobs))
 
-    dataset = BeatStemDataset(
+    dataset = UnlabeledStemDataset(
         dataset_root=args.dataset_root,
-        split=resolve_split(args.split),
         segment_seconds=args.segment_seconds,
         sample_rate=args.sample_rate,
         hop_length=args.hop_length,
         n_fft=args.n_fft,
-        random_pitch_shift=False,
         use_file_handle_cache=False,
+        manifest_path=args.manifest_path,
+        rebuild_manifest=args.rebuild_manifest,
     )
 
     songs = select_songs(dataset, args)
     if not songs:
         raise ValueError("No songs matched the requested filters")
 
-    tasks = build_tasks(songs, dataset.stem_names, args)
+    tasks = build_tasks(
+        songs=songs,
+        stem_names=dataset.stem_names,
+        output_dir=output_dir,
+    )
     if not tasks:
-        raise ValueError("No song/semitone combinations matched the requested filters")
+        raise ValueError("No songs matched the requested filters")
 
     print(
-        f"split={args.split}, songs={len(songs)}, variants={len(tasks)}, "
+        f"songs={len(songs)}, variants={len(tasks)}, "
         f"dtype={storage_dtype.name}, jobs={num_jobs}, "
         f"chunk_frames={args.chunk_frames}, output_dir={output_dir}"
     )
@@ -381,8 +357,8 @@ def main() -> None:
     deleted_stem_count = 0
 
     if num_jobs == 1:
-        for task in tqdm(tasks, desc="Packing stems", unit="variant"):
-            status, array_path, deleted_count = pack_song_variant(
+        for task in tqdm(tasks, desc="Packing stems", unit="song"):
+            status, array_path, deleted_count = pack_song(
                 task=task,
                 storage_dtype=storage_dtype,
                 chunk_frames=args.chunk_frames,
@@ -408,7 +384,12 @@ def main() -> None:
                 ): task
                 for task in tasks
             }
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Packing stems", unit="variant"):
+            for future in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc="Packing stems",
+                unit="song",
+            ):
                 status, array_path_str, deleted_count = future.result()
                 packed_paths.append(Path(array_path_str))
                 deleted_stem_count += deleted_count

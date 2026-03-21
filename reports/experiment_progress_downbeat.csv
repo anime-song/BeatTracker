@@ -27,3 +27,16 @@ completion_order,run_name,completed_at_estimated,best_downbeat_f1,running_best_d
 26,exp_chord_preinit_stemdrop2_drumaux_bassharmonic,2026-03-14 14:46:30 UTC,0.4406,0.4598
 27,exp_chord_preinit_stemdrop2_drumaux_pianoaux,2026-03-14 16:06:07 UTC,0.4440,0.4598
 28,exp_chord_preinit_stemdrop2_drumaux_highfreq,2026-03-15 03:28:47 UTC,0.4642,0.4642
+29,exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm,2026-03-15 05:34:47 UTC,0.4705,0.4705
+30,exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_bar,2026-03-15 07:42:39 UTC,0.4594,0.4705
+31,exp_chord_preinit_stemdrop2_drumaux_highfreq_repeatssm_timestretch_pm10,2026-03-15 10:06:35 UTC,0.3784,0.4705
+32,exp_meter_from_rhythm_head,2026-03-15 14:50:16 UTC,0.4464,0.4705
+33,exp_meter_from_rhythm_bilstm_w0_05,2026-03-16 14:10:41 UTC,0.4431,0.4705
+34,exp_meter_from_rhythm_bilstm_w0_05_balanced,2026-03-16 15:33:40 UTC,0.4338,0.4705
+35,exp_meter_from_rhythm_bilstm_w0_05_downbeatw1_5,2026-03-16 17:00:22 UTC,0.4502,0.4705
+36,exp_meter_from_rhythm_hardpred_w0_01,2026-03-17 02:45:02 UTC,0.4463,0.4705
+37,from_ssl_pretrain,2026-03-18 01:44:50 UTC,0.3605,0.4705
+38,from_ssl_plp_with_chord_boundary,2026-03-19 02:41:09 UTC,0.4894,0.4894
+39,from_ssl_drum_constrastive_pretrain,2026-03-20 13:06:27 UTC,0.4975,0.4975
+40,from_ssl_no_drum_constrastive_pretrain,2026-03-21 03:27:34 UTC,0.5093,0.5093
+41,from_ssl_pretrain_harmony_onset,2026-03-21 09:52:48 UTC,0.4690,0.5093
