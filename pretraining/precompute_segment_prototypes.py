@@ -85,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--hop-length",
         type=int,
-        default=441,
+        default=512,
     )
     parser.add_argument(
         "--n-fft",

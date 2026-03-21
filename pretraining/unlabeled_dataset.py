@@ -45,7 +45,7 @@ class UnlabeledStemDataset(Dataset):
         dataset_root: str | Path = "dataset/unlabeled_dataset",
         segment_seconds: float = 30.0,
         sample_rate: Optional[int] = None,
-        hop_length: int = 441,
+        hop_length: int = 512,
         n_fft: int = 2048,
         stem_names: Sequence[str] = DEFAULT_STEM_NAMES,
         samples_per_epoch: Optional[int] = None,
