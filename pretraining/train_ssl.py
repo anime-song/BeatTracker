@@ -21,12 +21,8 @@ if __package__ is None or __package__ == "":
         sys.path.insert(0, str(project_root))
 
 from models import AudioFeatureExtractor, Backbone
-from pretraining.augmentations import (
-    keep_only_stems,
-)
-from pretraining.contrastive import DrumContrastiveObjective
 from pretraining.masked_segment_model import compute_masked_segment_loss
-from pretraining.model import DrumContrastiveModel
+from pretraining.model import PretrainingModel
 from pretraining.unlabeled_dataset import (
     UnlabeledStemDataset,
     collate_unlabeled_stem_batch,
@@ -118,21 +114,18 @@ class ResumeState:
 class TrainingComponents:
     dataset: UnlabeledStemDataset
     train_loader: DataLoader
-    model: DrumContrastiveModel
-    objective: DrumContrastiveObjective
+    model: PretrainingModel
     chord_boundary_loss_fn: ShiftTolerantBCELoss
     chord_boundary_loss_weight: float
     masked_segment_loss_weight: float
     optimizer: torch.optim.Optimizer
     scheduler: Optional[WarmupCosineScheduler]
     scaler: torch.amp.GradScaler
-    drums_stem_index: int
-    num_stems: int
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Drum-contrastive + chord-boundary self-supervised pretraining for Backbone"
+        description="Chord-boundary + masked-segment self-supervised pretraining for Backbone"
     )
     # dataset / cache 周り
     parser.add_argument(
@@ -141,7 +134,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("outputs/ssl_drum_contrastive_pretrain"),
+        default=Path("outputs/ssl_pretrain"),
     )
     parser.add_argument(
         "--manifest-path",
@@ -216,8 +209,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-layers", type=int, default=6)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--head-dropout", type=float, default=0.1)
-    parser.add_argument("--projection-hidden-dim", type=int, default=256)
-    parser.add_argument("--rhythm-dim", type=int, default=128)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--grad-clip", type=float, default=1.0)
@@ -229,8 +220,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--warmup-epochs", type=float, default=2.0)
     parser.add_argument("--min-lr-ratio", type=float, default=0.1)
-    parser.add_argument("--temperature", type=float, default=0.1)
-    parser.add_argument("--rhythm-drum-weight", type=float, default=1.0)
 
     # auxiliary SSL targets
     parser.add_argument(
@@ -351,11 +340,7 @@ def build_training_components(
 ) -> TrainingComponents:
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
-    if (
-        args.chord_boundary_loss_weight <= 0.0
-        and args.rhythm_drum_weight <= 0.0
-        and args.masked_segment_loss_weight <= 0.0
-    ):
+    if args.chord_boundary_loss_weight <= 0.0 and args.masked_segment_loss_weight <= 0.0:
         raise ValueError("At least one SSL objective must be enabled")
 
     # cache は既定位置を自動検出し、masked segment が有効なときだけ prototype を必須にする。
@@ -392,15 +377,12 @@ def build_training_components(
         min_visible_segments=args.min_visible_segments,
         sample_retry_count=args.sample_retry_count,
     )
-    if "drums" not in dataset.stem_names:
-        raise ValueError("Drum-Contrastive SSL requires a 'drums' stem in the dataset")
     if args.masked_segment_loss_weight > 0.0 and dataset.num_prototypes <= 0:
         raise ValueError(
             "masked segment loss is enabled, but the prototype cache did not expose any prototypes"
         )
 
     # dataset 側は crop 済み音声と、boundary / segment prototype の両方を返す。
-    drums_stem_index = dataset.stem_names.index("drums")
     loader_kwargs = {
         "shuffle": False,
         "num_workers": args.num_workers,
@@ -430,10 +412,8 @@ def build_training_components(
         dropout=args.dropout,
         use_gradient_checkpoint=True,
     )
-    model = DrumContrastiveModel(
+    model = PretrainingModel(
         backbone=backbone,
-        rhythm_dim=args.rhythm_dim,
-        projection_hidden_dim=args.projection_hidden_dim,
         head_dropout=args.head_dropout,
         num_segment_prototypes=(
             dataset.num_prototypes if args.masked_segment_loss_weight > 0.0 else 0
@@ -443,10 +423,6 @@ def build_training_components(
         segment_predictor_hidden_dim=args.segment_predictor_hidden_dim,
     ).to(device)
 
-    objective = DrumContrastiveObjective(
-        temperature=args.temperature,
-        rhythm_drum_weight=args.rhythm_drum_weight,
-    )
     chord_boundary_loss_fn = ShiftTolerantBCELoss(
         pos_weight=args.chord_boundary_pos_weight,
         tolerance=args.chord_boundary_tolerance,
@@ -479,20 +455,17 @@ def build_training_components(
         dataset=dataset,
         train_loader=train_loader,
         model=model,
-        objective=objective,
         chord_boundary_loss_fn=chord_boundary_loss_fn,
         chord_boundary_loss_weight=float(args.chord_boundary_loss_weight),
         masked_segment_loss_weight=float(args.masked_segment_loss_weight),
         optimizer=optimizer,
         scheduler=scheduler,
         scaler=scaler,
-        drums_stem_index=drums_stem_index,
-        num_stems=len(dataset.stem_names),
     )
 
 
 def initialize_backbone_from_checkpoint(
-    model: DrumContrastiveModel,
+    model: PretrainingModel,
     checkpoint_path: Path,
 ) -> dict[str, object]:
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
@@ -552,7 +525,7 @@ def save_checkpoint(
     path: Path,
     epoch: int,
     global_step: int,
-    model: DrumContrastiveModel,
+    model: PretrainingModel,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[WarmupCosineScheduler],
     args: argparse.Namespace,
@@ -566,7 +539,7 @@ def save_checkpoint(
     checkpoint = {
         "epoch": epoch,
         "global_step": global_step,
-        "task": "ssl_drum_contrastive_pretrain",
+        "task": "ssl_pretrain",
         "model_state_dict": exported_backbone_state,
         "backbone_state_dict": model.backbone.state_dict(),
         "pretrain_state_dict": model.state_dict(),
@@ -580,7 +553,7 @@ def save_checkpoint(
 
 def load_resume_state(
     checkpoint_path: Path,
-    model: DrumContrastiveModel,
+    model: PretrainingModel,
     optimizer: torch.optim.Optimizer,
     scheduler: Optional[WarmupCosineScheduler],
 ) -> ResumeState:
@@ -588,7 +561,7 @@ def load_resume_state(
     pretrain_state = checkpoint.get("pretrain_state_dict")
     if not isinstance(pretrain_state, dict):
         raise ValueError(
-            "resume checkpoint must contain pretrain_state_dict produced by train_ssl_disentangle.py"
+            "resume checkpoint must contain pretrain_state_dict produced by train_ssl.py"
         )
 
     model.load_state_dict(pretrain_state, strict=True)
@@ -631,149 +604,89 @@ def train_one_epoch(
             for key, value in batch.items()
         }
         mix_waveform = batch.pop("waveform")
-        valid_mask = batch["valid_mask"]
 
         zero = mix_waveform.new_zeros(())
         chord_boundary_loss = zero
-        rhythm_drum_loss = zero
         masked_segment_loss = zero
-
-        # mix の feature extractor は一度だけ回して context を使い回す。
-        # これで「メモリ節約のための mix 再 forward」は維持しつつ、前段計算の重複を減らす。
-        with torch.no_grad():
-            mix_context = components.model.backbone.feature_extractor(mix_waveform)
-
-        drum_enabled = components.objective.rhythm_drum_weight > 0.0
         base_enabled = components.chord_boundary_loss_weight > 0.0
         masked_segment_enabled = components.masked_segment_loss_weight > 0.0
 
-        base_loss = zero
-        mix_output = None
-        need_mix_output = base_enabled or drum_enabled or masked_segment_enabled
+        mix_context = None
+        if masked_segment_enabled:
+            # masked segment は Backbone 入力前に spec を欠損させるので、
+            # feature extractor だけ先に 1 回回して context を渡す。
+            with torch.no_grad():
+                mix_context = components.model.backbone.feature_extractor(mix_waveform)
+
+        total_loss = zero
         with torch.amp.autocast(
             device_type=device.type,
             enabled=components.scaler.is_enabled(),
         ):
-            if need_mix_output:
-                # 1 回目の mix forward では、boundary と masked segment を同時に処理する。
-                # boundary も masked 入力から出すので、augmentation 的な頑健化として働く。
-                mix_output = components.model(
-                    mix_waveform,
-                    valid_mask=valid_mask,
-                    backbone_context=mix_context,
-                    segment_start_frames=(
-                        batch["segment_start_frames"]
-                        if masked_segment_enabled
-                        else None
-                    ),
-                    segment_inner_start_frames=(
-                        batch["segment_inner_start_frames"]
-                        if masked_segment_enabled
-                        else None
-                    ),
-                    segment_inner_end_frames=(
-                        batch["segment_inner_end_frames"]
-                        if masked_segment_enabled
-                        else None
-                    ),
-                    segment_valid_mask=(
-                        batch["segment_valid_mask"] if masked_segment_enabled else None
-                    ),
+            mix_output = components.model(
+                mix_waveform,
+                backbone_context=mix_context,
+                segment_start_frames=(
+                    batch["segment_start_frames"] if masked_segment_enabled else None
+                ),
+                segment_inner_start_frames=(
+                    batch["segment_inner_start_frames"]
+                    if masked_segment_enabled
+                    else None
+                ),
+                segment_inner_end_frames=(
+                    batch["segment_inner_end_frames"] if masked_segment_enabled else None
+                ),
+                segment_valid_mask=(
+                    batch["segment_valid_mask"] if masked_segment_enabled else None
+                ),
+            )
+
+            if base_enabled:
+                chord_boundary_loss = components.chord_boundary_loss_fn(
+                    preds=mix_output.chord_boundary_logits,
+                    targets=batch["chord_boundary_target"],
+                    mask=batch["chord_boundary_mask"],
+                )
+                total_loss = total_loss + (
+                    components.chord_boundary_loss_weight * chord_boundary_loss
                 )
 
-                if base_enabled:
-                    chord_boundary_loss = components.chord_boundary_loss_fn(
-                        preds=mix_output.chord_boundary_logits,
-                        targets=batch["chord_boundary_target"],
-                        mask=batch["chord_boundary_mask"],
-                    )
-                    base_loss = base_loss + (
-                        components.chord_boundary_loss_weight * chord_boundary_loss
-                    )
-
-                if (
-                    masked_segment_enabled
-                    and mix_output.segment_logits is not None
-                    and mix_output.masked_segment_mask is not None
-                    and mix_output.segment_valid_mask is not None
-                ):
-                    effective_segment_mask = (
-                        mix_output.masked_segment_mask & mix_output.segment_valid_mask
-                    )
-                    masked_segment_loss = compute_masked_segment_loss(
-                        logits=mix_output.segment_logits,
-                        targets=batch["segment_target_probs"],
-                        masked_segment_mask=effective_segment_mask,
-                        target_loss=args.masked_segment_target_loss,
-                    )
-                    base_loss = base_loss + (
-                        components.masked_segment_loss_weight * masked_segment_loss
-                    )
-                else:
-                    effective_segment_mask = batch["segment_valid_mask"].new_zeros(
-                        batch["segment_valid_mask"].shape
-                    )
+            if (
+                masked_segment_enabled
+                and mix_output.segment_logits is not None
+                and mix_output.masked_segment_mask is not None
+                and mix_output.segment_valid_mask is not None
+            ):
+                effective_segment_mask = (
+                    mix_output.masked_segment_mask & mix_output.segment_valid_mask
+                )
+                masked_segment_loss = compute_masked_segment_loss(
+                    logits=mix_output.segment_logits,
+                    targets=batch["segment_target_probs"],
+                    masked_segment_mask=effective_segment_mask,
+                    target_loss=args.masked_segment_target_loss,
+                )
+                total_loss = total_loss + (
+                    components.masked_segment_loss_weight * masked_segment_loss
+                )
             else:
                 effective_segment_mask = batch["segment_valid_mask"].new_zeros(
                     batch["segment_valid_mask"].shape
                 )
 
-        # base loss はここで先に backward して graph を捨てる。
-        # drum contrastive が有効なときだけ、後段で mix を再 forward してメモリを節約する。
-        base_did_backward = bool(base_loss.requires_grad)
-        if base_did_backward:
+        did_step = bool(total_loss.requires_grad)
+        if did_step:
             scaled_backward(
                 components.scaler,
-                base_loss,
+                total_loss,
                 retain_graph=False,
             )
-            del mix_output
-            mix_output = None
-
-        if drum_enabled:
-            with torch.no_grad():
-                drums_waveform = keep_only_stems(
-                    mix_waveform,
-                    num_stems=components.num_stems,
-                    keep_stem_indices=[components.drums_stem_index],
-                )
-            with torch.amp.autocast(
-                device_type=device.type,
-                enabled=components.scaler.is_enabled(),
-            ):
-                if mix_output is None:
-                    # base loss で graph を破棄した後、contrastive 用にだけ mix を再構築する。
-                    mix_output = components.model(
-                        mix_waveform,
-                        valid_mask=valid_mask,
-                        backbone_context=mix_context,
-                    )
-                drums_output = components.model(drums_waveform, valid_mask=valid_mask)
-                rhythm_drum_loss = components.objective.rhythm_drum_weight * (
-                    components.objective._info_nce_loss(
-                        mix_output.rhythm_summary,
-                        drums_output.rhythm_summary,
-                    )
-                )
-            scaled_backward(
-                components.scaler,
-                rhythm_drum_loss,
-                retain_graph=False,
-            )
-
-            del drums_waveform
-            del drums_output
-
-        did_step = base_did_backward or bool(rhythm_drum_loss.requires_grad)
-
-        ssl_loss = rhythm_drum_loss + (
-            components.masked_segment_loss_weight * masked_segment_loss
-        )
-        loss = base_loss + rhythm_drum_loss
+        ssl_loss = components.masked_segment_loss_weight * masked_segment_loss
+        loss = total_loss
 
         ssl_metrics = {
             "ssl_loss": float(ssl_loss.detach()),
-            "rhythm_drum_loss": float(rhythm_drum_loss.detach()),
             "masked_segment_loss": float(masked_segment_loss.detach()),
         }
 
@@ -822,14 +735,14 @@ def train_one_epoch(
         if step_index % max(1, log_interval) == 0:
             progress.set_postfix(
                 loss=f"{batch_metrics['loss']:.4f}",
-                drum=f"{batch_metrics['rhythm_drum_loss']:.4f}",
+                boundary=f"{batch_metrics['chord_boundary_loss']:.4f}",
                 seg=f"{batch_metrics['masked_segment_loss']:.4f}",
             )
 
         del mix_waveform
-        del mix_context
-        del valid_mask
         del mix_output
+        if mix_context is not None:
+            del mix_context
         del batch
 
     return averager.averages(), global_step

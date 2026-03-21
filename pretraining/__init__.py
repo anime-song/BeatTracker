@@ -1,4 +1,3 @@
 from .chord_boundary_teacher import ChordBoundaryTeacher
-from .contrastive import DrumContrastiveObjective
-from .model import DrumContrastiveModel
+from .model import PretrainingModel
 from .unlabeled_dataset import UnlabeledStemDataset
