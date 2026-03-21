@@ -1,8 +1,8 @@
 # Experiment Summary
 
-Generated: 2026-03-21 10:25:23 UTC
+Generated: 2026-03-21 12:03:01 UTC
 
-Runs: 44
+Runs: 45
 
 ## Progress
 
@@ -12,6 +12,7 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 
 | run | status | best_epoch | best_downbeat_f1 | last_epoch | last_downbeat_f1 | seed | lr | batch | meter_w | drum_aux_w | drum_hf | stem_drop | init | model | branch |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| beat_transcription_hop512 | complete | 14 | 0.5737 | 30 | 0.5555 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:ema_state_dict | L6/H64/O256 | hop512-cqt |
 | from_ssl_no_drum_constrastive_pretrain | complete | 19 | 0.5093 | 30 | 0.4765 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | from_ssl_drum_constrastive_pretrain | complete | 21 | 0.4975 | 30 | 0.4738 | 42 | 0.000300 | 8 | 0.050 | 0.100 | true | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
 | from_ssl_plp_with_chord_boundary | complete | 23 | 0.4894 | 30 | 0.4752 | 42 | 0.000300 | 8 | 0.050 | 0.100 | false | 4 | backbone:model_state_dict | L6/H64/O256 | exp/ssl-pretrain-plp |
@@ -56,6 +57,40 @@ Completion order is estimated from `history.jsonl` / `config.json` modification 
 | ssl_pretrain_harmony_onset | complete | - | - | 100 | - | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | ssl_no_drum_contrastive_pretrain | complete | - | - | 100 | - | 42 | 0.000300 | 8 | - | - | - | - | - | L6/H64/O256 | - |
 | ssl_drum_contrastive_pretrain | complete | - | - | 100 | - | 42 | 0.000300 | 4 | - | - | - | - | - | L6/H64/O256 | - |
+
+## beat_transcription_hop512
+
+| field | value |
+| --- | --- |
+| path | outputs/beat_transcription_hop512 |
+| status | complete |
+| best_epoch | 14 |
+| best_downbeat_f1 | 0.5737 |
+| best_beat_f1 | 0.6338 |
+| best_val_loss | 1.2466 |
+| last_epoch | 30 |
+| last_downbeat_f1 | 0.5555 |
+| configured_epochs | 30 |
+| seed | 42 |
+| lr | 0.000300 |
+| batch_size | 8 |
+| train_samples_per_epoch | 1024 |
+| segment_seconds | 30.0 |
+| meter_loss_weight | 0.050 |
+| drum_aux_loss_weight | 0.100 |
+| drum_aux_use_high_frequency_flux | true |
+| stem_dropout_max_count | 4 |
+| init_scope | backbone |
+| init_from | pretraining/assets/chord_transcription/model_epoch_200.pt |
+| init_state_source | ema_state_dict |
+| audio_backend | packed |
+| scheduler | warmup_cosine |
+| ema_decay | 0.9990 |
+| model | L6/H64/O256 |
+| resume | - |
+| git_branch | hop512-cqt |
+| git_commit | 84a73326fd61abcf940a066c3012855bf3b6be66 |
+| git_dirty | true |
 
 ## from_ssl_no_drum_constrastive_pretrain
 
