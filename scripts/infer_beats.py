@@ -221,6 +221,22 @@ def infer_use_drum_high_frequency_flux(
     )
 
 
+def infer_use_chord_boundary_head(
+    state_dict: dict[str, torch.Tensor],
+    config: dict[str, object],
+) -> bool:
+    if "use_chord_boundary_head" in config:
+        return bool(config["use_chord_boundary_head"]) or any(
+            key.startswith("head.chord_boundary_head.")
+            for key in state_dict.keys()
+        )
+
+    return any(
+        key.startswith("head.chord_boundary_head.")
+        for key in state_dict.keys()
+    )
+
+
 def resolve_stem_file_paths(
     song_dir: Path,
     song_id: str,
@@ -489,6 +505,7 @@ def build_model_from_config(
     num_audio_channels: int,
     num_stems: int,
     num_meter_classes: int,
+    use_chord_boundary_head: bool,
     use_drum_aux_head: bool,
     use_drum_high_frequency_flux: bool,
 ) -> BeatTranscriptionModel:
@@ -513,6 +530,7 @@ def build_model_from_config(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=num_meter_classes,
+        use_chord_boundary_head=use_chord_boundary_head,
         use_drum_aux_head=use_drum_aux_head,
         use_drum_high_frequency_flux=use_drum_high_frequency_flux,
         head_dropout=float(config.get("head_dropout", 0.0)),
@@ -977,6 +995,7 @@ def main() -> None:
         )
 
     num_meter_classes = infer_num_meter_classes(state_dict, config)
+    use_chord_boundary_head = infer_use_chord_boundary_head(state_dict, config)
     use_drum_aux_head = infer_use_drum_aux_head(state_dict, config)
     use_drum_high_frequency_flux = infer_use_drum_high_frequency_flux(
         state_dict, config
@@ -986,6 +1005,7 @@ def main() -> None:
         num_audio_channels=int(loaded_audio.waveform.shape[0]),
         num_stems=len(args.stem_names),
         num_meter_classes=num_meter_classes,
+        use_chord_boundary_head=use_chord_boundary_head,
         use_drum_aux_head=use_drum_aux_head,
         use_drum_high_frequency_flux=use_drum_high_frequency_flux,
     )
