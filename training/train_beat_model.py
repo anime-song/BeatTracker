@@ -240,13 +240,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--specaugment-time-mask-span",
         type=int,
-        default=0,
+        default=8,
         help="SpecAugment の時間マスク幅。0 なら無効。",
     )
     parser.add_argument(
         "--specaugment-time-mask-ratio",
         type=float,
-        default=0.0,
+        default=0.1,
         help="SpecAugment で時間軸の何割を隠すか。0.0 なら無効。",
     )
     parser.add_argument(
