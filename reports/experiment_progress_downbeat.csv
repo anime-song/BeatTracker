@@ -40,3 +40,6 @@ completion_order,run_name,completed_at_estimated,best_downbeat_f1,running_best_d
 39,from_ssl_drum_constrastive_pretrain,2026-03-20 13:06:27 UTC,0.4975,0.4975
 40,from_ssl_no_drum_constrastive_pretrain,2026-03-21 03:27:34 UTC,0.5093,0.5093
 41,from_ssl_pretrain_harmony_onset,2026-03-21 09:52:48 UTC,0.4690,0.5093
+42,beat_transcription_hop512,2026-03-21 11:38:34 UTC,0.5737,0.5737
+43,beat_transcription_hop512_pretrain,2026-03-22 01:33:56 UTC,0.5471,0.5737
+44,beat_transcription_with_boundary,2026-03-22 06:10:09 UTC,0.5672,0.5737

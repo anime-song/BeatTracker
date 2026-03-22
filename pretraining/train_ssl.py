@@ -199,7 +199,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--segment-seconds", type=float, default=30.0)
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--n-fft", type=int, default=2048)
-    parser.add_argument("--hop-length", type=int, default=441)
+    parser.add_argument("--hop-length", type=int, default=512)
     parser.add_argument("--bins-per-octave", type=int, default=36)
     parser.add_argument("--n-bins", type=int, default=252)
 

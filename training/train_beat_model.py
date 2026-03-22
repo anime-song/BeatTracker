@@ -234,9 +234,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--segment-seconds", type=float, default=30.0)
     parser.add_argument("--sample-rate", type=int, default=22050)
     parser.add_argument("--n-fft", type=int, default=2048)
-    parser.add_argument("--hop-length", type=int, default=441)
+    parser.add_argument("--hop-length", type=int, default=512)
     parser.add_argument("--bins-per-octave", type=int, default=36)
     parser.add_argument("--n-bins", type=int, default=252)
+    parser.add_argument(
+        "--specaugment-time-mask-span",
+        type=int,
+        default=8,
+        help="SpecAugment の時間マスク幅。0 なら無効。",
+    )
+    parser.add_argument(
+        "--specaugment-time-mask-ratio",
+        type=float,
+        default=0.1,
+        help="SpecAugment で時間軸の何割を隠すか。0.0 なら無効。",
+    )
+    parser.add_argument(
+        "--specaugment-prob",
+        type=float,
+        default=1.0,
+        help="SpecAugment を適用する確率。",
+    )
+    parser.add_argument(
+        "--specaugment-fixed-time-mask-size",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="True のとき、時間マスク span を固定長で切る。",
+    )
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--output-dim", type=int, default=256)
     parser.add_argument("--num-layers", type=int, default=6)
@@ -249,6 +273,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--downbeat-pos-weight", type=float, default=20.0)
     parser.add_argument("--meter-loss-weight", type=float, default=0.05)
     parser.add_argument(
+        "--chord-boundary-cache-dir",
+        type=Path,
+        default=None,
+        help="事前計算済み chord boundary cache。未指定なら <dataset-root>/.chord_boundary_cache を自動検出する。",
+    )
+    parser.add_argument(
+        "--chord-boundary-loss-weight",
+        type=float,
+        default=0.1,
+        help="疑似 chord boundary を使う補助 loss の重み。",
+    )
+    parser.add_argument(
+        "--chord-boundary-pos-weight",
+        type=float,
+        default=5.0,
+        help="chord boundary 補助 loss の positive weight。",
+    )
+    parser.add_argument(
+        "--chord-boundary-tolerance",
+        type=int,
+        default=2,
+        help="chord boundary 補助 loss の許容シフト幅。",
+    )
+    parser.add_argument(
         "--drum-aux-loss-weight",
         type=float,
         default=0.1,
@@ -256,7 +304,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--drum-aux-use-high-frequency-flux",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="drums stem 由来の high-frequency flux 回帰も補助 loss に含める。",
     )
     parser.add_argument(
@@ -393,6 +442,17 @@ def build_dataloaders(
     if args.num_workers > 0 and args.prefetch_factor <= 0:
         raise ValueError("prefetch_factor must be positive when num_workers > 0")
 
+    chord_boundary_cache_dir = args.chord_boundary_cache_dir
+    if chord_boundary_cache_dir is None and args.chord_boundary_loss_weight > 0.0:
+        default_cache_dir = args.dataset_root / ".chord_boundary_cache"
+        if default_cache_dir.exists():
+            chord_boundary_cache_dir = default_cache_dir
+    if args.chord_boundary_loss_weight > 0.0 and chord_boundary_cache_dir is None:
+        raise ValueError(
+            "chord boundary loss is enabled, but no chord boundary cache was found"
+        )
+    args.chord_boundary_cache_dir = chord_boundary_cache_dir
+
     train_dataset = BeatStemDataset(
         dataset_root=args.dataset_root,
         split="train",
@@ -404,6 +464,7 @@ def build_dataloaders(
         random_pitch_shift=not args.disable_random_pitch_shift,
         audio_backend=args.audio_backend,
         packed_audio_dir=args.packed_audio_dir,
+        chord_boundary_cache_dir=chord_boundary_cache_dir,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
     )
@@ -418,6 +479,7 @@ def build_dataloaders(
         audio_backend=args.audio_backend,
         packed_audio_dir=args.packed_audio_dir,
         meter_to_index=train_dataset.meter_to_index,
+        chord_boundary_cache_dir=chord_boundary_cache_dir,
         use_file_handle_cache=not args.disable_file_handle_cache,
         max_open_files=args.max_open_files,
     )
@@ -448,6 +510,21 @@ def build_dataloaders(
 def build_model(
     args: argparse.Namespace, train_dataset: BeatStemDataset
 ) -> BeatTranscriptionModel:
+    use_specaugment = (
+        args.specaugment_time_mask_span > 0 and args.specaugment_time_mask_ratio > 0.0
+    )
+    spec_augment_params = None
+    if use_specaugment:
+        spec_augment_params = {
+            "freq_mask_param": 0,
+            "time_mask_param": args.specaugment_time_mask_span,
+            "num_freq_masks": 0,
+            "num_time_masks": 0,
+            "p": args.specaugment_prob,
+            "time_mask_ratio": args.specaugment_time_mask_ratio,
+            "fixed_time_mask_size": args.specaugment_fixed_time_mask_size,
+        }
+
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=args.sample_rate,
         n_fft=args.n_fft,
@@ -456,7 +533,7 @@ def build_model(
         num_stems=len(train_dataset.stem_names),
         bins_per_octave=args.bins_per_octave,
         n_bins=args.n_bins,
-        spec_augment_params=None,
+        spec_augment_params=spec_augment_params,
     )
     backbone = Backbone(
         feature_extractor=feature_extractor,
@@ -469,6 +546,7 @@ def build_model(
     return BeatTranscriptionModel(
         backbone=backbone,
         num_meter_classes=train_dataset.num_meter_classes,
+        use_chord_boundary_head=args.chord_boundary_loss_weight > 0.0,
         use_drum_aux_head=args.drum_aux_loss_weight > 0.0,
         use_drum_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
         head_dropout=args.head_dropout,
@@ -661,7 +739,9 @@ def compute_loss(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    chord_boundary_loss_fn: ShiftTolerantBCELoss,
     meter_loss_weight: float,
+    chord_boundary_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
 ) -> tuple[torch.Tensor, dict[str, float]]:
@@ -691,6 +771,27 @@ def compute_loss(
         )
     else:
         meter_accuracy = 0.0
+
+    raw_chord_boundary_loss = beat_loss.new_tensor(0.0)
+    chord_boundary_loss = beat_loss.new_tensor(0.0)
+    chord_boundary_supervised_samples = 0.0
+    chord_boundary_event_count = 0.0
+    if chord_boundary_loss_weight > 0.0:
+        if output.chord_boundary_logits is None:
+            raise ValueError("Model output must include chord_boundary_logits")
+
+        raw_chord_boundary_loss = chord_boundary_loss_fn(
+            output.chord_boundary_logits,
+            batch["chord_boundary_target"],
+            batch["chord_boundary_mask"],
+        )
+        chord_boundary_loss = raw_chord_boundary_loss * chord_boundary_loss_weight
+        chord_boundary_supervised_samples = float(
+            (batch["chord_boundary_mask"].sum(dim=1) > 0).float().mean().detach()
+        )
+        chord_boundary_event_count = float(
+            batch["chord_boundary_event_count"].float().mean().detach()
+        )
 
     raw_drum_aux_loss = beat_loss.new_tensor(0.0)
     broadband_flux_loss = beat_loss.new_tensor(0.0)
@@ -731,8 +832,10 @@ def compute_loss(
 
     drum_aux_loss = raw_drum_aux_loss * drum_aux_loss_weight
 
-    # 補助タスクは meter と drum aux を足す。
-    total_loss = beat_loss + downbeat_loss + meter_loss + drum_aux_loss
+    # 補助タスクは meter / chord boundary / drum aux を足す。
+    total_loss = (
+        beat_loss + downbeat_loss + meter_loss + chord_boundary_loss + drum_aux_loss
+    )
     return total_loss, {
         "loss": float(total_loss.detach()),
         "beat_loss": float(beat_loss.detach()),
@@ -740,6 +843,10 @@ def compute_loss(
         "meter_loss": float(meter_loss.detach()),
         "raw_meter_loss": float(raw_meter_loss.detach()),
         "meter_accuracy": meter_accuracy,
+        "chord_boundary_loss": float(chord_boundary_loss.detach()),
+        "raw_chord_boundary_loss": float(raw_chord_boundary_loss.detach()),
+        "chord_boundary_supervised_samples": chord_boundary_supervised_samples,
+        "chord_boundary_event_count": chord_boundary_event_count,
         "drum_aux_loss": float(drum_aux_loss.detach()),
         "raw_drum_aux_loss": float(raw_drum_aux_loss.detach()),
         "broadband_flux_loss": float(broadband_flux_loss.detach()),
@@ -844,7 +951,9 @@ def train_one_epoch(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    chord_boundary_loss_fn: ShiftTolerantBCELoss,
     meter_loss_weight: float,
+    chord_boundary_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     num_stems: int,
@@ -891,7 +1000,9 @@ def train_one_epoch(
                 beat_loss_fn,
                 downbeat_loss_fn,
                 meter_loss_fn,
+                chord_boundary_loss_fn,
                 meter_loss_weight,
+                chord_boundary_loss_weight,
                 drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux,
             )
@@ -944,6 +1055,26 @@ def train_one_epoch(
                 global_step,
             )
             writer.add_scalar(
+                "train_step/chord_boundary_loss",
+                loss_info["chord_boundary_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/raw_chord_boundary_loss",
+                loss_info["raw_chord_boundary_loss"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/chord_boundary_supervised_samples",
+                loss_info["chord_boundary_supervised_samples"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/chord_boundary_event_count",
+                loss_info["chord_boundary_event_count"],
+                global_step,
+            )
+            writer.add_scalar(
                 "train_step/drum_aux_loss",
                 loss_info["drum_aux_loss"],
                 global_step,
@@ -983,6 +1114,7 @@ def train_one_epoch(
                 beat=f"{loss_info['beat_loss']:.4f}",
                 downbeat=f"{loss_info['downbeat_loss']:.4f}",
                 meter=f"{loss_info['meter_loss']:.4f}",
+                boundary=f"{loss_info['chord_boundary_loss']:.4f}",
                 drum=f"{loss_info['drum_aux_loss']:.4f}",
             )
 
@@ -996,7 +1128,9 @@ def validate(
     beat_loss_fn: ShiftTolerantBCELoss,
     downbeat_loss_fn: ShiftTolerantBCELoss,
     meter_loss_fn: BalancedSoftmaxLoss,
+    chord_boundary_loss_fn: ShiftTolerantBCELoss,
     meter_loss_weight: float,
+    chord_boundary_loss_weight: float,
     drum_aux_loss_weight: float,
     drum_aux_use_high_frequency_flux: bool,
     device: torch.device,
@@ -1041,7 +1175,9 @@ def validate(
             beat_loss_fn,
             downbeat_loss_fn,
             meter_loss_fn,
+            chord_boundary_loss_fn,
             meter_loss_weight,
+            chord_boundary_loss_weight,
             drum_aux_loss_weight,
             drum_aux_use_high_frequency_flux,
         )
@@ -1203,6 +1339,10 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "meter_loss",
         "raw_meter_loss",
         "meter_accuracy",
+        "chord_boundary_loss",
+        "raw_chord_boundary_loss",
+        "chord_boundary_supervised_samples",
+        "chord_boundary_event_count",
         "drum_aux_loss",
         "raw_drum_aux_loss",
         "broadband_flux_loss",
@@ -1266,6 +1406,10 @@ def main() -> None:
         class_counts=train_dataset.meter_class_counts,
         ignore_index=train_dataset.meter_ignore_index,
     ).to(device)
+    chord_boundary_loss_fn = ShiftTolerantBCELoss(
+        pos_weight=args.chord_boundary_pos_weight,
+        tolerance=args.chord_boundary_tolerance,
+    ).to(device)
 
     history_path = args.output_dir / "history.jsonl"
     best_downbeat_f1 = -1.0
@@ -1299,6 +1443,13 @@ def main() -> None:
         {
             "meter_labels": list(train_dataset.meter_labels),
             "meter_class_counts": train_dataset.meter_class_counts.tolist(),
+            "use_chord_boundary_head": args.chord_boundary_loss_weight > 0.0,
+            "chord_boundary_cache_dir": None
+            if args.chord_boundary_cache_dir is None
+            else str(args.chord_boundary_cache_dir),
+            "chord_boundary_loss_weight": args.chord_boundary_loss_weight,
+            "chord_boundary_pos_weight": args.chord_boundary_pos_weight,
+            "chord_boundary_tolerance": args.chord_boundary_tolerance,
             "use_drum_aux_head": args.drum_aux_loss_weight > 0.0,
             "drum_aux_use_high_frequency_flux": args.drum_aux_use_high_frequency_flux,
             "init_state_source": None
@@ -1325,10 +1476,19 @@ def main() -> None:
     )
     print(f"metric_tolerance_sec={args.metric_tolerance_sec}")
     print(f"meter_loss_weight={args.meter_loss_weight}")
+    print(f"chord_boundary_loss_weight={args.chord_boundary_loss_weight}")
+    print(f"chord_boundary_pos_weight={args.chord_boundary_pos_weight}")
+    print(f"chord_boundary_tolerance={args.chord_boundary_tolerance}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(
-        "drum_aux_use_high_frequency_flux="
-        f"{args.drum_aux_use_high_frequency_flux}"
+        "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
+    )
+    print(
+        "specaugment_time="
+        f"span={args.specaugment_time_mask_span}, "
+        f"ratio={args.specaugment_time_mask_ratio}, "
+        f"prob={args.specaugment_prob}, "
+        f"fixed={args.specaugment_fixed_time_mask_size}"
     )
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
@@ -1354,6 +1514,10 @@ def main() -> None:
         f"packed_audio_dir={args.packed_audio_dir or (args.dataset_root / 'songs_packed')}"
     )
     print(
+        "chord_boundary_cache_dir="
+        f"{args.chord_boundary_cache_dir or (args.dataset_root / '.chord_boundary_cache')}"
+    )
+    print(
         "dataloader="
         f"num_workers={args.num_workers}, "
         f"persistent_workers={args.num_workers > 0 and not args.disable_persistent_workers}, "
@@ -1374,7 +1538,9 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                chord_boundary_loss_fn=chord_boundary_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                chord_boundary_loss_weight=args.chord_boundary_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 num_stems=len(train_dataset.stem_names),
@@ -1394,7 +1560,9 @@ def main() -> None:
                 beat_loss_fn=beat_loss_fn,
                 downbeat_loss_fn=downbeat_loss_fn,
                 meter_loss_fn=meter_loss_fn,
+                chord_boundary_loss_fn=chord_boundary_loss_fn,
                 meter_loss_weight=args.meter_loss_weight,
+                chord_boundary_loss_weight=args.chord_boundary_loss_weight,
                 drum_aux_loss_weight=args.drum_aux_loss_weight,
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 device=device,

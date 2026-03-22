@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import random
-from typing import Dict, Tuple, List
+import math
+from typing import Dict, Tuple, List, Optional
 
 
 class SpecAugment(nn.Module):
@@ -18,6 +19,8 @@ class SpecAugment(nn.Module):
         num_freq_masks: int = 1,
         num_time_masks: int = 1,
         p: float = 1.0,
+        time_mask_ratio: Optional[float] = None,
+        fixed_time_mask_size: bool = False,
     ):
         """
         Args:
@@ -26,6 +29,10 @@ class SpecAugment(nn.Module):
             num_freq_masks (int): 適用する周波数マスクの数
             num_time_masks (int): 適用する時間マスクの数
             p (float): Augmentationを適用する確率
+            time_mask_ratio (float | None): 時間軸で何割を隠すか。指定時は
+                num_time_masks よりこちらを優先して、非重複な time mask を作る。
+            fixed_time_mask_size (bool): True のとき、各 span は time_mask_param
+                を基準に固定長で切る。
         """
         super().__init__()
         self.freq_mask_param = freq_mask_param
@@ -33,6 +40,83 @@ class SpecAugment(nn.Module):
         self.num_freq_masks = num_freq_masks
         self.num_time_masks = num_time_masks
         self.p = p
+        self.time_mask_ratio = (
+            None if time_mask_ratio is None else float(time_mask_ratio)
+        )
+        self.fixed_time_mask_size = bool(fixed_time_mask_size)
+
+        if self.time_mask_ratio is not None and not 0.0 <= self.time_mask_ratio <= 1.0:
+            raise ValueError("time_mask_ratio must be between 0.0 and 1.0")
+
+    def _apply_random_freq_masks(
+        self,
+        aug_spec: torch.Tensor,
+        freq_mask: torch.Tensor,
+        batch_index: int,
+        num_mels: int,
+    ) -> None:
+        for _ in range(self.num_freq_masks):
+            f = random.randint(0, self.freq_mask_param)
+            if f == 0:
+                continue
+            f0 = random.randint(0, num_mels - f)
+            aug_spec[batch_index, :, f0 : f0 + f, :] = 0
+            freq_mask[batch_index, f0 : f0 + f] = True
+
+    def _estimate_num_time_spans(self, num_frames: int) -> int:
+        if (
+            self.time_mask_ratio is None
+            or self.time_mask_ratio <= 0.0
+            or self.time_mask_param <= 0
+            or num_frames <= 0
+        ):
+            return 0
+
+        target_frames = min(
+            num_frames,
+            max(1, int(round(num_frames * self.time_mask_ratio))),
+        )
+        max_span_width = min(self.time_mask_param, num_frames)
+        if self.fixed_time_mask_size:
+            mean_span_width = max_span_width
+        else:
+            # 可変長のときは平均幅で本数を近似する。
+            mean_span_width = max(1.0, (max_span_width + 1) * 0.5)
+
+        # overlap を許容する近似版。少しだけ多めに打って実効 mask rate を近づける。
+        return max(
+            1,
+            int(math.ceil((target_frames / mean_span_width) * 1.15)),
+        )
+
+    def _apply_time_masks(
+        self,
+        aug_spec: torch.Tensor,
+        time_mask: torch.Tensor,
+        batch_index: int,
+        num_frames: int,
+    ) -> None:
+        if self.time_mask_ratio is not None:
+            max_span_width = min(self.time_mask_param, num_frames)
+            num_spans = self._estimate_num_time_spans(num_frames)
+            for _ in range(num_spans):
+                if self.fixed_time_mask_size:
+                    width = max_span_width
+                else:
+                    width = random.randint(1, max_span_width)
+                start = random.randint(0, num_frames - width)
+                end = start + width
+                aug_spec[batch_index, :, :, start:end] = 0
+                time_mask[batch_index, start:end] = True
+            return
+
+        for _ in range(self.num_time_masks):
+            t = random.randint(0, self.time_mask_param)
+            if t == 0:
+                continue
+            t0 = random.randint(0, num_frames - t)
+            aug_spec[batch_index, :, :, t0 : t0 + t] = 0
+            time_mask[batch_index, t0 : t0 + t] = True
 
     def forward(self, spec: torch.Tensor) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
@@ -54,23 +138,18 @@ class SpecAugment(nn.Module):
         aug_spec = spec.clone()
 
         for i in range(batch_size):
-            # 周波数マスキング
-            for _ in range(self.num_freq_masks):
-                f = random.randint(0, self.freq_mask_param)
-                if f == 0:
-                    continue
-                f0 = random.randint(0, num_mels - f)
-                aug_spec[i, :, f0 : f0 + f, :] = 0
-                freq_mask[i, f0 : f0 + f] = True
-
-            # 時間マスキング
-            for _ in range(self.num_time_masks):
-                t = random.randint(0, self.time_mask_param)
-                if t == 0:
-                    continue
-                t0 = random.randint(0, num_frames - t)
-                aug_spec[i, :, :, t0 : t0 + t] = 0
-                time_mask[i, t0 : t0 + t] = True
+            self._apply_random_freq_masks(
+                aug_spec=aug_spec,
+                freq_mask=freq_mask,
+                batch_index=i,
+                num_mels=num_mels,
+            )
+            self._apply_time_masks(
+                aug_spec=aug_spec,
+                time_mask=time_mask,
+                batch_index=i,
+                num_frames=num_frames,
+            )
 
         return aug_spec, {"freq_mask": freq_mask, "time_mask": time_mask}
 

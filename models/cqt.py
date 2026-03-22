@@ -34,6 +34,11 @@ class RecursiveCQT(nn.Module):
         self.bins_per_octave = bins_per_octave
         self.window = window
 
+        if self.hop_length <= 0 or (self.hop_length & (self.hop_length - 1)) != 0:
+            raise ValueError(
+                "RecursiveCQT requires hop_length to be a positive power of two"
+            )
+
         # CQT計算用の定数を設定
         # Q値: CQTの周波数解像度を決定する定数
         self.q = filter_scale / (2.0 ** (1.0 / bins_per_octave) - 1.0)

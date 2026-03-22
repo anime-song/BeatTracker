@@ -239,6 +239,7 @@ class BeatTranscriptionOutput:
     beat_logits: torch.Tensor
     downbeat_logits: torch.Tensor
     meter_logits: Optional[torch.Tensor] = None
+    chord_boundary_logits: Optional[torch.Tensor] = None
     broadband_flux_logits: Optional[torch.Tensor] = None
     onset_env_logits: Optional[torch.Tensor] = None
     high_frequency_flux_logits: Optional[torch.Tensor] = None
@@ -436,6 +437,7 @@ class BeatDownbeatHead(nn.Module):
         self,
         input_dim: int,
         num_meter_classes: int,
+        use_chord_boundary_head: bool = False,
         use_drum_aux_head: bool = False,
         use_drum_high_frequency_flux: bool = False,
         dropout: float = 0.0,
@@ -447,6 +449,9 @@ class BeatDownbeatHead(nn.Module):
         self.downbeat_head = nn.Linear(input_dim, 1)
         # meter は拍子全体を 1 クラスで当てるので、多クラス head を別に持つ。
         self.meter_head = nn.Linear(input_dim, num_meter_classes)
+        self.chord_boundary_head = (
+            nn.Linear(input_dim, 1) if use_chord_boundary_head else None
+        )
         self.drum_aux_head = (
             DrumAuxHead(
                 input_dim,
@@ -465,6 +470,11 @@ class BeatDownbeatHead(nn.Module):
         downbeat_logits = self.downbeat_head(x).squeeze(-1)
         beat_logits = beat_logits + downbeat_logits
         meter_logits = self.meter_head(x)
+        chord_boundary_logits = (
+            None
+            if self.chord_boundary_head is None
+            else self.chord_boundary_head(x).squeeze(-1)
+        )
         if self.drum_aux_head is None:
             broadband_flux_logits = None
             onset_env_logits = None
@@ -482,6 +492,7 @@ class BeatDownbeatHead(nn.Module):
             beat_logits=beat_logits,
             downbeat_logits=downbeat_logits,
             meter_logits=meter_logits,
+            chord_boundary_logits=chord_boundary_logits,
             broadband_flux_logits=broadband_flux_logits,
             onset_env_logits=onset_env_logits,
             high_frequency_flux_logits=high_frequency_flux_logits,
@@ -498,6 +509,7 @@ class BeatTranscriptionModel(nn.Module):
         self,
         backbone: Backbone,
         num_meter_classes: int,
+        use_chord_boundary_head: bool = False,
         use_drum_aux_head: bool = False,
         use_drum_high_frequency_flux: bool = False,
         head_dropout: float = 0.0,
@@ -507,6 +519,7 @@ class BeatTranscriptionModel(nn.Module):
         self.head = BeatDownbeatHead(
             backbone.output_dim,
             num_meter_classes=num_meter_classes,
+            use_chord_boundary_head=use_chord_boundary_head,
             use_drum_aux_head=use_drum_aux_head,
             use_drum_high_frequency_flux=use_drum_high_frequency_flux,
             dropout=head_dropout,

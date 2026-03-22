@@ -112,7 +112,7 @@ def parse_args() -> argparse.Namespace:
         default=22050,
         help="BeatStemDataset のメタデータ読込に使う値です。packed 出力自体は元の sample rate を保持します。",
     )
-    parser.add_argument("--hop-length", type=int, default=441)
+    parser.add_argument("--hop-length", type=int, default=512)
     parser.add_argument("--n-fft", type=int, default=2048)
     parser.add_argument("--segment-seconds", type=float, default=30.0)
     return parser.parse_args()
