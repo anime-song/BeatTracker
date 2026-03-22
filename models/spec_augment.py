@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import random
+import math
 from typing import Dict, Tuple, List, Optional
 
 
@@ -62,48 +63,31 @@ class SpecAugment(nn.Module):
             aug_spec[batch_index, :, f0 : f0 + f, :] = 0
             freq_mask[batch_index, f0 : f0 + f] = True
 
-    def _sample_non_overlapping_time_spans(
-        self,
-        num_frames: int,
-    ) -> list[tuple[int, int]]:
+    def _estimate_num_time_spans(self, num_frames: int) -> int:
         if (
             self.time_mask_ratio is None
             or self.time_mask_ratio <= 0.0
             or self.time_mask_param <= 0
             or num_frames <= 0
         ):
-            return []
+            return 0
 
         target_frames = min(
             num_frames,
             max(1, int(round(num_frames * self.time_mask_ratio))),
         )
-        spans: list[tuple[int, int]] = []
-        occupied = torch.zeros(num_frames, dtype=torch.bool)
-        remaining = target_frames
+        max_span_width = min(self.time_mask_param, num_frames)
+        if self.fixed_time_mask_size:
+            mean_span_width = max_span_width
+        else:
+            # 可変長のときは平均幅で本数を近似する。
+            mean_span_width = max(1.0, (max_span_width + 1) * 0.5)
 
-        while remaining > 0:
-            width = min(self.time_mask_param, remaining)
-            if not self.fixed_time_mask_size:
-                width = random.randint(1, width)
-            if width <= 0 or width > num_frames:
-                break
-
-            valid_starts = [
-                start
-                for start in range(0, num_frames - width + 1)
-                if not bool(occupied[start : start + width].any())
-            ]
-            if not valid_starts:
-                break
-
-            start = random.choice(valid_starts)
-            end = start + width
-            occupied[start:end] = True
-            spans.append((start, end))
-            remaining -= width
-
-        return spans
+        # overlap を許容する近似版。少しだけ多めに打って実効 mask rate を近づける。
+        return max(
+            1,
+            int(math.ceil((target_frames / mean_span_width) * 1.15)),
+        )
 
     def _apply_time_masks(
         self,
@@ -113,8 +97,15 @@ class SpecAugment(nn.Module):
         num_frames: int,
     ) -> None:
         if self.time_mask_ratio is not None:
-            spans = self._sample_non_overlapping_time_spans(num_frames)
-            for start, end in spans:
+            max_span_width = min(self.time_mask_param, num_frames)
+            num_spans = self._estimate_num_time_spans(num_frames)
+            for _ in range(num_spans):
+                if self.fixed_time_mask_size:
+                    width = max_span_width
+                else:
+                    width = random.randint(1, max_span_width)
+                start = random.randint(0, num_frames - width)
+                end = start + width
                 aug_spec[batch_index, :, :, start:end] = 0
                 time_mask[batch_index, start:end] = True
             return
