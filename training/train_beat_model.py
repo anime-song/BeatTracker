@@ -237,6 +237,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hop-length", type=int, default=512)
     parser.add_argument("--bins-per-octave", type=int, default=36)
     parser.add_argument("--n-bins", type=int, default=252)
+    parser.add_argument(
+        "--specaugment-time-mask-span",
+        type=int,
+        default=0,
+        help="SpecAugment の時間マスク幅。0 なら無効。",
+    )
+    parser.add_argument(
+        "--specaugment-time-mask-ratio",
+        type=float,
+        default=0.0,
+        help="SpecAugment で時間軸の何割を隠すか。0.0 なら無効。",
+    )
+    parser.add_argument(
+        "--specaugment-prob",
+        type=float,
+        default=1.0,
+        help="SpecAugment を適用する確率。",
+    )
+    parser.add_argument(
+        "--specaugment-fixed-time-mask-size",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="True のとき、時間マスク span を固定長で切る。",
+    )
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--output-dim", type=int, default=256)
     parser.add_argument("--num-layers", type=int, default=6)
@@ -257,7 +281,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--chord-boundary-loss-weight",
         type=float,
-        default=0.0,
+        default=0.1,
         help="疑似 chord boundary を使う補助 loss の重み。",
     )
     parser.add_argument(
@@ -486,6 +510,21 @@ def build_dataloaders(
 def build_model(
     args: argparse.Namespace, train_dataset: BeatStemDataset
 ) -> BeatTranscriptionModel:
+    use_specaugment = (
+        args.specaugment_time_mask_span > 0 and args.specaugment_time_mask_ratio > 0.0
+    )
+    spec_augment_params = None
+    if use_specaugment:
+        spec_augment_params = {
+            "freq_mask_param": 0,
+            "time_mask_param": args.specaugment_time_mask_span,
+            "num_freq_masks": 0,
+            "num_time_masks": 0,
+            "p": args.specaugment_prob,
+            "time_mask_ratio": args.specaugment_time_mask_ratio,
+            "fixed_time_mask_size": args.specaugment_fixed_time_mask_size,
+        }
+
     feature_extractor = AudioFeatureExtractor(
         sampling_rate=args.sample_rate,
         n_fft=args.n_fft,
@@ -494,7 +533,7 @@ def build_model(
         num_stems=len(train_dataset.stem_names),
         bins_per_octave=args.bins_per_octave,
         n_bins=args.n_bins,
-        spec_augment_params=None,
+        spec_augment_params=spec_augment_params,
     )
     backbone = Backbone(
         feature_extractor=feature_extractor,
@@ -748,10 +787,7 @@ def compute_loss(
         )
         chord_boundary_loss = raw_chord_boundary_loss * chord_boundary_loss_weight
         chord_boundary_supervised_samples = float(
-            (batch["chord_boundary_mask"].sum(dim=1) > 0)
-            .float()
-            .mean()
-            .detach()
+            (batch["chord_boundary_mask"].sum(dim=1) > 0).float().mean().detach()
         )
         chord_boundary_event_count = float(
             batch["chord_boundary_event_count"].float().mean().detach()
@@ -798,11 +834,7 @@ def compute_loss(
 
     # 補助タスクは meter / chord boundary / drum aux を足す。
     total_loss = (
-        beat_loss
-        + downbeat_loss
-        + meter_loss
-        + chord_boundary_loss
-        + drum_aux_loss
+        beat_loss + downbeat_loss + meter_loss + chord_boundary_loss + drum_aux_loss
     )
     return total_loss, {
         "loss": float(total_loss.detach()),
@@ -1449,8 +1481,14 @@ def main() -> None:
     print(f"chord_boundary_tolerance={args.chord_boundary_tolerance}")
     print(f"drum_aux_loss_weight={args.drum_aux_loss_weight}")
     print(
-        "drum_aux_use_high_frequency_flux="
-        f"{args.drum_aux_use_high_frequency_flux}"
+        "drum_aux_use_high_frequency_flux=" f"{args.drum_aux_use_high_frequency_flux}"
+    )
+    print(
+        "specaugment_time="
+        f"span={args.specaugment_time_mask_span}, "
+        f"ratio={args.specaugment_time_mask_ratio}, "
+        f"prob={args.specaugment_prob}, "
+        f"fixed={args.specaugment_fixed_time_mask_size}"
     )
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
     print(f"tensorboard_dir={tensorboard_dir}")
