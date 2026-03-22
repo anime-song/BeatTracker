@@ -15,6 +15,7 @@ import torchaudio
 import torchaudio.functional as AF
 from torch.utils.data import Dataset
 
+from data.chord_boundary_targets import ChordBoundaryTargetBuilder
 from data.beat_dataset import DEFAULT_STEM_NAMES, PackedAudioEntry
 
 
@@ -96,7 +97,6 @@ class UnlabeledStemDataset(Dataset):
         self.max_cached_prototype_entries = int(max_cached_prototype_entries)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
         self._packed_array_cache: OrderedDict[str, np.ndarray] = OrderedDict()
-        self._boundary_cache: OrderedDict[str, torch.Tensor] = OrderedDict()
         self._prototype_target_cache: OrderedDict[
             str, dict[str, torch.Tensor | str | float]
         ] = OrderedDict()
@@ -115,8 +115,6 @@ class UnlabeledStemDataset(Dataset):
             raise ValueError("audio_backend must be either 'wav' or 'packed'")
         if self.max_open_files <= 0:
             raise ValueError("max_open_files must be positive")
-        if self.max_cached_boundary_entries <= 0:
-            raise ValueError("max_cached_boundary_entries must be positive")
         if self.max_cached_prototype_entries <= 0:
             raise ValueError("max_cached_prototype_entries must be positive")
         if not self.dataset_root.exists():
@@ -160,6 +158,10 @@ class UnlabeledStemDataset(Dataset):
         )
         self.songs = songs
         self._configure_prototype_cache()
+        self.chord_boundary_target_builder = ChordBoundaryTargetBuilder(
+            cache_dir=self.chord_boundary_cache_dir,
+            max_cached_entries=self.max_cached_boundary_entries,
+        )
 
     def _load_manifest(self) -> Optional[list[UnlabeledSongEntry]]:
         if not self.manifest_path.exists():
@@ -374,7 +376,6 @@ class UnlabeledStemDataset(Dataset):
         state = self.__dict__.copy()
         state["_audio_file_cache"] = OrderedDict()
         state["_packed_array_cache"] = OrderedDict()
-        state["_boundary_cache"] = OrderedDict()
         state["_prototype_target_cache"] = OrderedDict()
         return state
 
@@ -382,7 +383,6 @@ class UnlabeledStemDataset(Dataset):
         self.__dict__.update(state)
         self._audio_file_cache = OrderedDict()
         self._packed_array_cache = OrderedDict()
-        self._boundary_cache = OrderedDict()
         self._prototype_target_cache = OrderedDict()
 
     def __del__(self) -> None:
@@ -397,35 +397,8 @@ class UnlabeledStemDataset(Dataset):
             mmap_handle = getattr(packed_array, "_mmap", None)
             if mmap_handle is not None:
                 mmap_handle.close()
-        self._boundary_cache.clear()
+        self.chord_boundary_target_builder.clear_cache()
         self._prototype_target_cache.clear()
-
-    def _get_chord_boundary_path(self, song_id: str) -> Optional[Path]:
-        if self.chord_boundary_cache_dir is None:
-            return None
-        return self.chord_boundary_cache_dir / f"{song_id}.pt"
-
-    def _load_chord_boundary_times(self, song_id: str) -> Optional[torch.Tensor]:
-        cache_key = str(song_id)
-        cached = self._boundary_cache.pop(cache_key, None)
-        if cached is not None:
-            self._boundary_cache[cache_key] = cached
-            return cached
-
-        boundary_path = self._get_chord_boundary_path(song_id)
-        if boundary_path is None or not boundary_path.exists():
-            return None
-
-        payload = torch.load(boundary_path, map_location="cpu", weights_only=False)
-        boundary_times = payload.get("boundary_times_sec")
-        if not torch.is_tensor(boundary_times):
-            return None
-
-        boundary_times = boundary_times.to(torch.float32)
-        self._boundary_cache[cache_key] = boundary_times
-        while len(self._boundary_cache) > self.max_cached_boundary_entries:
-            self._boundary_cache.popitem(last=False)
-        return boundary_times
 
     def _get_prototype_target_path(self, song_id: str) -> Optional[Path]:
         if self.prototype_song_target_dir is None:
@@ -467,42 +440,6 @@ class UnlabeledStemDataset(Dataset):
             self.target_num_frames,
             1 + ((valid_samples - self.n_fft) // self.hop_length),
         )
-
-    def _render_chord_boundary_target(
-        self,
-        song: UnlabeledSongEntry,
-        start_sec: float,
-        valid_mask: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, float]:
-        """
-        事前推論済みの boundary 時刻を、現在の crop に対応する frame target へ変換する。
-        cache がない曲は mask を 0 にして loss から落とす。
-        """
-
-        target = torch.zeros(self.target_num_frames, dtype=torch.float32)
-        boundary_times = self._load_chord_boundary_times(song.song_id)
-        if boundary_times is None:
-            return target, torch.zeros_like(valid_mask), 0.0
-
-        mask = valid_mask.clone()
-        relative_times = boundary_times - float(start_sec)
-        visible = (relative_times >= 0.0) & (relative_times < self.segment_seconds)
-        visible_times = relative_times[visible]
-        if visible_times.numel() == 0:
-            return target, mask, 0.0
-
-        frame_indices = torch.round(
-            visible_times * (float(self.sample_rate) / float(self.hop_length))
-        ).to(torch.long)
-        frame_indices = frame_indices.clamp(
-            min=0, max=max(0, self.target_num_frames - 1)
-        )
-        valid_frame_indices = frame_indices[
-            frame_indices < int(valid_mask.sum().item())
-        ]
-        if valid_frame_indices.numel() > 0:
-            target.index_fill_(0, valid_frame_indices.unique(sorted=True), 1.0)
-        return target, mask, float(valid_frame_indices.numel())
 
     def _render_segment_prototype_targets(
         self,
@@ -776,13 +713,13 @@ class UnlabeledStemDataset(Dataset):
         # loss から無効末尾フレームを外せるように valid_mask も返す。
         valid_mask = torch.zeros(self.target_num_frames, dtype=torch.float32)
         valid_mask[:valid_frames] = 1.0
-        (
-            chord_boundary_target,
-            chord_boundary_mask,
-            chord_boundary_event_count,
-        ) = self._render_chord_boundary_target(
-            song=song,
+        chord_boundary_targets = self.chord_boundary_target_builder.build(
+            song_id=song.song_id,
             start_sec=start_sec,
+            segment_seconds=self.segment_seconds,
+            sample_rate=self.sample_rate,
+            hop_length=self.hop_length,
+            target_num_frames=self.target_num_frames,
             valid_mask=valid_mask,
         )
         segment_payload = self._render_segment_prototype_targets(
@@ -794,9 +731,9 @@ class UnlabeledStemDataset(Dataset):
             "waveform": waveform,
             "valid_mask": valid_mask,
             "valid_frames": valid_frames,
-            "chord_boundary_target": chord_boundary_target,
-            "chord_boundary_mask": chord_boundary_mask,
-            "chord_boundary_event_count": chord_boundary_event_count,
+            "chord_boundary_target": chord_boundary_targets.target,
+            "chord_boundary_mask": chord_boundary_targets.mask,
+            "chord_boundary_event_count": chord_boundary_targets.event_count,
             "segment_start_frames": segment_payload["segment_start_frames"],
             "segment_end_frames": segment_payload["segment_end_frames"],
             "segment_inner_start_frames": segment_payload["segment_inner_start_frames"],

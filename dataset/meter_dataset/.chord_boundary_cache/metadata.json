@@ -1,0 +1,14 @@
+{
+  "dataset_root": "dataset/meter_dataset/songs_separated",
+  "output_dir": "dataset/meter_dataset/.chord_boundary_cache",
+  "audio_backend": "packed",
+  "packed_audio_dir": "dataset/meter_dataset/songs_packed",
+  "checkpoint_path": "pretraining/assets/chord_transcription/model_epoch_200.pt",
+  "config_path": "pretraining/assets/chord_transcription/config.yaml",
+  "sample_rate": 22050,
+  "hop_length": 512,
+  "n_fft": 2048,
+  "boundary_threshold": 0.5,
+  "nms_window_radius": 3,
+  "min_boundary_distance_frames": 4
+}

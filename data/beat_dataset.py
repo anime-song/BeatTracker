@@ -17,6 +17,7 @@ import torchaudio.functional as AF
 from torch.utils.data import Dataset
 
 from .aux_targets import StemAuxTargetBuilder
+from .chord_boundary_targets import ChordBoundaryTargetBuilder
 
 
 DEFAULT_STEM_NAMES = ("bass", "drums", "guitar", "other", "piano", "vocals")
@@ -284,8 +285,10 @@ class BeatStemDataset(Dataset):
         audio_backend: str = "wav",
         packed_audio_dir: Optional[str | Path] = None,
         meter_to_index: Optional[Dict[str, int]] = None,
+        chord_boundary_cache_dir: Optional[str | Path] = None,
         use_file_handle_cache: bool = True,
         max_open_files: int = 64,
+        max_cached_boundary_entries: int = 256,
     ) -> None:
         super().__init__()
 
@@ -307,8 +310,14 @@ class BeatStemDataset(Dataset):
         self.random_pitch_shift = random_pitch_shift
         self.audio_backend = str(audio_backend)
         self.meter_ignore_index = -100
+        self.chord_boundary_cache_dir = (
+            None
+            if chord_boundary_cache_dir is None
+            else Path(chord_boundary_cache_dir)
+        )
         self.use_file_handle_cache = bool(use_file_handle_cache)
         self.max_open_files = int(max_open_files)
+        self.max_cached_boundary_entries = int(max_cached_boundary_entries)
         self._audio_file_cache: OrderedDict[str, sf.SoundFile] = OrderedDict()
         self._packed_array_cache: OrderedDict[str, np.ndarray] = OrderedDict()
 
@@ -477,6 +486,10 @@ class BeatStemDataset(Dataset):
             hop_length=self.hop_length,
             target_num_frames=self.target_num_frames,
         )
+        self.chord_boundary_target_builder = ChordBoundaryTargetBuilder(
+            cache_dir=self.chord_boundary_cache_dir,
+            max_cached_entries=self.max_cached_boundary_entries,
+        )
 
         self.songs = songs
         detected_meter_labels = {
@@ -557,6 +570,7 @@ class BeatStemDataset(Dataset):
             mmap_handle = getattr(packed_array, "_mmap", None)
             if mmap_handle is not None:
                 mmap_handle.close()
+        self.chord_boundary_target_builder.clear_cache()
 
     def _get_cached_audio_file(self, wav_path: Path) -> sf.SoundFile:
         cache_key = str(wav_path)
@@ -821,12 +835,24 @@ class BeatStemDataset(Dataset):
             waveform=waveform,
             valid_frames=valid_frames,
         )
+        chord_boundary_targets = self.chord_boundary_target_builder.build(
+            song_id=song.song_id,
+            start_sec=start_sec,
+            segment_seconds=self.segment_seconds,
+            sample_rate=self.sample_rate,
+            hop_length=self.hop_length,
+            target_num_frames=self.target_num_frames,
+            valid_mask=valid_mask,
+        )
 
         return {
             "waveform": waveform,
             "beat_targets": beat_targets,
             "downbeat_targets": downbeat_targets,
             "meter_targets": meter_targets,
+            "chord_boundary_target": chord_boundary_targets.target,
+            "chord_boundary_mask": chord_boundary_targets.mask,
+            "chord_boundary_event_count": chord_boundary_targets.event_count,
             "broadband_flux_targets": aux_targets.broadband_flux_targets,
             "onset_env_targets": aux_targets.onset_env_targets,
             "high_frequency_flux_targets": aux_targets.high_frequency_flux_targets,
