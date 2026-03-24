@@ -60,6 +60,48 @@ def apply_ranked_stem_dropout(
 
 
 @torch.no_grad()
+def apply_random_stem_gain(
+    waveform: torch.Tensor,
+    num_stems: int,
+    max_gain_db: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    stem ごとに独立なランダム gain を掛ける。
+    同じ stem 内の左右チャンネルは同じ gain を共有する。
+    """
+    if waveform.dim() != 3:
+        raise ValueError("waveform must have shape (B, C, T)")
+    if num_stems <= 0:
+        raise ValueError("num_stems must be positive")
+    if waveform.shape[1] % num_stems != 0:
+        raise ValueError("audio channels must be divisible by num_stems")
+
+    max_gain_db = float(max_gain_db)
+    batch_size, num_channels, num_samples = waveform.shape
+    channels_per_stem = num_channels // num_stems
+    if max_gain_db <= 0.0:
+        random_gain_db = torch.zeros(
+            (batch_size, num_stems),
+            dtype=waveform.dtype,
+            device=waveform.device,
+        )
+        return waveform, random_gain_db
+
+    stem_waveform = waveform.view(batch_size, num_stems, channels_per_stem, num_samples)
+    random_gain_db = torch.empty(
+        (batch_size, num_stems),
+        dtype=waveform.dtype,
+        device=waveform.device,
+    ).uniform_(-max_gain_db, max_gain_db)
+    gain = torch.pow(
+        torch.tensor(10.0, dtype=waveform.dtype, device=waveform.device),
+        random_gain_db / 20.0,
+    )
+    augmented = stem_waveform * gain.unsqueeze(-1).unsqueeze(-1)
+    return augmented.view_as(waveform), random_gain_db
+
+
+@torch.no_grad()
 def time_stretch_waveform(
     x: torch.Tensor, rate: float, n_fft=256, hop_length=128, win_length=256
 ) -> torch.Tensor:

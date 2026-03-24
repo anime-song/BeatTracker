@@ -32,7 +32,7 @@ if __package__ is None or __package__ == "":
 from data import BeatStemDataset
 from data.beat_dataset import SongEntry
 from models import AudioFeatureExtractor, Backbone, BeatTranscriptionModel
-from training.augmentations import apply_ranked_stem_dropout
+from training.augmentations import apply_random_stem_gain, apply_ranked_stem_dropout
 from training.losses import BalancedSoftmaxLoss, ShiftTolerantBCELoss, masked_l1_loss
 
 
@@ -311,8 +311,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--stem-dropout-max-count",
         type=int,
-        default=4,
+        default=5,
         help="train 時にエネルギーの小さい stem から最大何本まで落とすか。0 で無効。",
+    )
+    parser.add_argument(
+        "--stem-gain-db-range",
+        type=float,
+        default=6.0,
+        help="train 時に stem ごとへ掛けるランダム gain の最大絶対値[dB]。0 で無効。",
     )
     parser.add_argument("--loss-tolerance", type=int, default=1)
     parser.add_argument("--metric-tolerance-sec", type=float, default=0.07)
@@ -958,6 +964,7 @@ def train_one_epoch(
     drum_aux_use_high_frequency_flux: bool,
     num_stems: int,
     stem_dropout_max_count: int,
+    stem_gain_db_range: float,
     device: torch.device,
     use_amp: bool,
     grad_clip: float,
@@ -980,6 +987,7 @@ def train_one_epoch(
         optimizer.zero_grad(set_to_none=True)
 
         dropped_stem_count = 0.0
+        stem_gain_db_abs_mean = 0.0
         if stem_dropout_max_count > 0:
             batch["waveform"], dropped_counts = apply_ranked_stem_dropout(
                 batch["waveform"],
@@ -987,6 +995,13 @@ def train_one_epoch(
                 max_dropout_stems=stem_dropout_max_count,
             )
             dropped_stem_count = float(dropped_counts.float().mean().item())
+        if stem_gain_db_range > 0.0:
+            batch["waveform"], applied_stem_gain_db = apply_random_stem_gain(
+                batch["waveform"],
+                num_stems=num_stems,
+                max_gain_db=stem_gain_db_range,
+            )
+            stem_gain_db_abs_mean = float(applied_stem_gain_db.abs().mean().item())
 
         with (
             torch.autocast(device_type=device.type, dtype=torch.float16)
@@ -1007,6 +1022,7 @@ def train_one_epoch(
                 drum_aux_use_high_frequency_flux,
             )
             loss_info["stem_dropout_count"] = dropped_stem_count
+            loss_info["stem_gain_db_abs_mean"] = stem_gain_db_abs_mean
 
         if scaler.is_enabled():
             previous_scale = scaler.get_scale()
@@ -1102,6 +1118,11 @@ def train_one_epoch(
             writer.add_scalar(
                 "train_step/stem_dropout_count",
                 loss_info["stem_dropout_count"],
+                global_step,
+            )
+            writer.add_scalar(
+                "train_step/stem_gain_db_abs_mean",
+                loss_info["stem_gain_db_abs_mean"],
                 global_step,
             )
             writer.add_scalar(
@@ -1349,6 +1370,7 @@ def format_metrics(prefix: str, metrics: dict[str, float]) -> str:
         "onset_env_loss",
         "high_frequency_flux_loss",
         "stem_dropout_count",
+        "stem_gain_db_abs_mean",
         "beat_precision",
         "beat_recall",
         "beat_f1",
@@ -1491,6 +1513,7 @@ def main() -> None:
         f"fixed={args.specaugment_fixed_time_mask_size}"
     )
     print(f"stem_dropout_max_count={args.stem_dropout_max_count}")
+    print(f"stem_gain_db_range={args.stem_gain_db_range}")
     print(f"tensorboard_dir={tensorboard_dir}")
     print(f"scheduler={args.scheduler}")
     print(f"ema={'disabled' if ema is None else f'decay={ema.decay}'}")
@@ -1545,6 +1568,7 @@ def main() -> None:
                 drum_aux_use_high_frequency_flux=args.drum_aux_use_high_frequency_flux,
                 num_stems=len(train_dataset.stem_names),
                 stem_dropout_max_count=args.stem_dropout_max_count,
+                stem_gain_db_range=args.stem_gain_db_range,
                 device=device,
                 use_amp=args.use_amp,
                 grad_clip=args.grad_clip,
